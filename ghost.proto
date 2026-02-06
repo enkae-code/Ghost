@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package ghost;
+option go_package = "ghost/kernel/internal/protocol";
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+// THE NERVOUS SYSTEM
+// The Central Nervous System (Kernel) orchestrates all organs.
+// Exposes both gRPC (High Speed) and REST HTTP (Human Dashboard).
+service NervousSystem {
+  
+  // --- SENSORY INPUT (Body -> Kernel) ---
+  // Sentinel streams visual changes to Kernel.
+  rpc ReportFocus (stream FocusState) returns (google.protobuf.Empty);
+  
+  // --- COGNITION (Brain -> Kernel) ---
+  // Brain requests permission to act.
+  rpc RequestPermission (PermissionRequest) returns (PermissionResponse);
+  
+  // --- MOTOR CONTROL (Kernel -> Body) ---
+  // Sentinel subscribes to a stream of approved actions.
+  rpc StreamActions (google.protobuf.Empty) returns (stream ActionCommand);
+
+  // --- HUMAN CONTROL PLANE (Gateway HTTP) ---
+  
+  // UI asks: "Is there anything waiting for approval?"
+  rpc GetPendingApprovals (google.protobuf.Empty) returns (PendingList) {
+    option (google.api.http) = { get: "/v1/approvals" };
+  }
+
+  // User says: "Yes, do it."
+  rpc ApproveAction (ApprovalDecision) returns (Ack) {
+    option (google.api.http) = { post: "/v1/approve/{action_id}" };
+  }
+  
+  // User says: "Switch Mode."
+  rpc SetSystemMode (ModeRequest) returns (Ack) {
+    option (google.api.http) = { post: "/v1/system/mode" };
+  }
+  
+  // Dashboard polling for status
+  rpc GetSystemState (google.protobuf.Empty) returns (SystemState) {
+    option (google.api.http) = { get: "/v1/system/state" };
+  }
+}
+
+// -- DATA STRUCTURES --
+
+message FocusState {
+  string window_title = 1;
+  string process_name = 2;
+  string ui_tree_snapshot = 3; 
+}
+
+message PermissionRequest {
+  string intent = 1;
+  repeated Action actions = 2;
+  string trace_id = 3;
+}
+
+message PermissionResponse {
+  bool approved = 1;
+  string reason = 2;
+  int32 trust_score = 3;
+}
+
+message Action {
+  string type = 1;          // "CLICK", "TYPE", "EXEC", "SPEAK"
+  map<string, string> payload = 2;
+}
+
+message ActionCommand {
+  string command_id = 1;
+  Action action = 2;
+}
+
+message PendingList {
+    repeated PendingItem items = 1;
+}
+
+message PendingItem {
+    string action_id = 1;
+    string intent = 2;
+    int32 risk_score = 3;
+}
+
+message ApprovalDecision {
+    string action_id = 1;
+    bool approved = 2;
+}
+
+message ModeRequest {
+    string domain = 1; // "*" or "browser"
+    string mode = 2;   // "AUTO", "MANUAL"
+}
+
+message SystemState {
+    string state = 1; // "ACTIVE", "SHADOW", "PAUSED"
+    string active_focus = 2;
+}
+
+message Ack { bool success = 1; }

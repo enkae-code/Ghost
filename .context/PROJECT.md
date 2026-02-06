@@ -16,3 +16,9 @@ A voice-controlled, local-first AI system for the Mozilla Fellowship.
 1. **Sovereignty:** User data never leaves the device.
 2. **Speed:** Transactional architecture for low latency.
 3. **Safety:** Kernel-level permission gating.
+
+## Governance
+
+- **Branch Protection:** `main` is protected.
+- **Workflow:** No direct commits to `main`. All changes must come via Pull Request (Human or Agent).
+- **History:** Force pushes are forbidden on `main`.
