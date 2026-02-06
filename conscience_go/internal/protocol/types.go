@@ -283,8 +283,9 @@ const (
 	RiskLevelCritical RiskLevel = 10 // Critical: financial, credentials
 )
 
-// Action represents a single executable action from the Brain
-type Action struct {
+// LegacyAction represents a single executable action from the Brain (JSON-RPC legacy)
+// Note: For gRPC, use the proto-generated Action type in ghost.pb.go
+type LegacyAction struct {
 	Type           string          `json:"type"`              // "CLICK", "TYPE", "KEY", "HOTKEY", "SCROLL", "OPEN_URL", etc.
 	Target         string          `json:"target,omitempty"`  // UI element or target
 	Payload        json.RawMessage `json:"payload,omitempty"` // Action-specific data
@@ -304,12 +305,12 @@ type ActionValidationResult struct {
 
 // ActionValidationRequest is sent to the Conscience Kernel
 type ActionValidationRequest struct {
-	RequestID      string   `json:"request_id"`
-	Intent         string   `json:"intent"`
-	Actions        []Action `json:"actions"`
-	ExpectedWindow string   `json:"expected_window,omitempty"`
-	Override       bool     `json:"override"` // If true, bypass RiskLevel checks
-	TraceID        string   `json:"trace_id,omitempty"`
+	RequestID      string         `json:"request_id"`
+	Intent         string         `json:"intent"`
+	Actions        []LegacyAction `json:"actions"`
+	ExpectedWindow string         `json:"expected_window,omitempty"`
+	Override       bool           `json:"override"` // If true, bypass RiskLevel checks
+	TraceID        string         `json:"trace_id,omitempty"`
 }
 
 // Client Registry Types

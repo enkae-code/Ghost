@@ -24,6 +24,7 @@ from gui.animations import TrayState
 from gui.tray import TrayIcon
 from ears.hearing import WhisperEngine
 from ears.recorder import AudioRecorder
+from brain.nerve import Nerve
 
 class PiperEngine:
     """
@@ -150,7 +151,15 @@ class Ghost:
         self.logger.info("Brain module loaded")
         print(Fore.GREEN + "[GHOST] ✓ Brain Online.")
 
-        print(Fore.CYAN + f"[GHOST] Kernel configured at {self.kernel_host}:{self.kernel_port} (transactional mode)")
+        # --- NERVE CONNECTION (gRPC to Conscience Kernel) ---
+        print(Fore.CYAN + "[GHOST] 🔗 Connecting Nerves to Conscience...")
+        self.nerve = Nerve(host=self.kernel_host, port=50051)
+        try:
+            self.nerve.connect()
+            print(Fore.GREEN + "[GHOST] ✓ Nervous System Connected.")
+        except Exception as e:
+            self.logger.warning(f"Nerve connection failed (will retry on first use): {e}")
+            print(Fore.YELLOW + "[GHOST] ⚠️ Conscience offline (will retry).")
 
         print(Fore.CYAN + "[GHOST] 👁️  Connecting to Sentinel...")
         self.body = SentinelBridge()
@@ -364,86 +373,27 @@ class Ghost:
 
     def _request_permission(self, intent: str, actions: list, expected_window: str = None, trace_id: str = None) -> dict:
         """
-        Request permission from the Safety Kernel using transactional sockets.
-
-        Uses visual verification retry loop if expected_window is specified.
-        Each retry opens a fresh socket connection (no persistent state).
+        Request permission via gRPC Nerve.
 
         Returns:
-            dict: Permission response with keys: approved, reason, error_code, trust_score
+            dict: Permission response with keys: approved, reason, trust_score
         """
-        request_id = str(uuid.uuid4())
-
-        # Build permission request with trace_id
-        permission_request = {
-            "id": request_id,
-            "intent": intent,
-            "trace_id": trace_id or str(uuid.uuid4())[:8],
-            "actions": [
-                {
-                    "type": action.get("type", ""),
-                    "payload": {k: v for k, v in action.items() if k != "type"}
-                }
-                for action in actions
-            ]
-        }
-
-        if expected_window:
-            permission_request["expected_window"] = expected_window
-
-        # Visual Verification Retry Loop (config-driven)
-        max_retries = self.retry_limit
-        retry_delay = self.retry_delay
-
-        for attempt in range(max_retries):
-            # Use transactional socket for each attempt
-            response = self._request_kernel(permission_request)
-
-            # If kernel is unavailable, fail-open (graceful degradation)
-            if response is None:
-                if attempt == 0:
-                    print(Fore.YELLOW + "[KERNEL] Warning: Kernel unavailable. Proceeding without safety checks.")
-                return {"id": request_id, "approved": True, "reason": "Kernel unavailable"}
-
-            # Check for FOCUS_MISMATCH error code
-            error_code = response.get("error_code", "")
-
-            if error_code == "FOCUS_MISMATCH":
-                if attempt == 0:
-                    print(Fore.YELLOW + f"[VISION] Waiting for focus: '{expected_window}'...")
-
-                # Show progress every 10 attempts (1 second)
-                if attempt % 10 == 0 and attempt > 0:
-                    print(Fore.YELLOW + f"[VISION]    Still waiting... ({attempt * retry_delay:.1f}s elapsed)")
-
-                # Retry after delay
-                time.sleep(retry_delay)
-                continue
-
-            # If approved or blocked for other reasons, return immediately
-            if response.get("approved", False):
-                # Display trust score if available
-                trust_score = response.get("trust_score", 0)
-                if trust_score > 0:
-                    confidence = "High" if trust_score > 10 else "Medium" if trust_score > 5 else "Low"
-                    print(Fore.CYAN + f"[MEMORY] Trust Score: {trust_score} ({confidence} confidence)")
-
-                if expected_window and attempt > 0:
-                    print(Fore.GREEN + f"[VISION] Focus Confirmed: '{expected_window}' (after {attempt * retry_delay:.1f}s)")
-
-                return response
-            else:
-                # Blocked for safety reasons (not focus mismatch)
-                return response
-
-        # Timeout: Focus never matched
-        print(Fore.RED + f"[VISION] Timeout: Expected window '{expected_window}' never appeared (5s elapsed)")
-        return {
-            "id": request_id,
-            "approved": False,
-            "reason": f"Focus verification timeout: '{expected_window}' not detected",
-            "error_code": "FOCUS_TIMEOUT"
-        }
+        trace_id = trace_id or str(uuid.uuid4())[:8]
+        
+        # The Nerve handles the gRPC marshalling
+        response = self.nerve.request_permission(intent, actions, trace_id)
+        
+        # Logic to handle "Conscience Unreachable" or "Approved"
+        if response["approved"]:
+            # Display trust score if available
+            score = response.get("trust_score", 0)
+            if score > 0:
+                confidence = "High" if score > 10 else "Medium" if score > 5 else "Low"
+                print(Fore.CYAN + f"[MEMORY] Trust Score: {score} ({confidence} confidence)")
+            return response
+        else:
+            print(Fore.RED + f"[CONSCIENCE] Blocked: {response.get('reason')}")
+            return response
 
     def _execute_intent(self, user_input: str):
         # --- MUTEX LOCK: ACQUIRE ---
