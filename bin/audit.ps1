@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Jules Auditor (Patched)
+    Ghost Auditor
     Implements the Hollow Prism security checks since the CLI v0.1.42 lacks 'audit'.
 
 .DESCRIPTION

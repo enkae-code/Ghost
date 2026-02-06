@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 use anyhow::{Context, Result};
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};

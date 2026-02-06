@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 use anyhow::{Result, Context};
 use enigo::{Enigo, Mouse, Keyboard, Settings, Direction, Key, Button};
 use serde::{Deserialize, Serialize};

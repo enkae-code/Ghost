@@ -825,8 +825,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    tray_icon = TrayIcon(title="Ghost Phantom")
-    brain_container: dict[str, GhostPhantom] = {}
+    tray_icon = TrayIcon(title="Ghost")
+    brain_container: dict[str, Ghost] = {}
 
     tray_icon.set_quit_handler(lambda: _handle_quit(brain_container, tray_icon))
 
