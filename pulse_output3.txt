@@ -1,0 +1,72 @@
+>>> STARTING GHOST SYSTEM...
+>>> [KERNEL] Started (PID: 4204)
+{"time":"2026-02-06T11:17:35.6448117-06:00","level":"INFO","msg":"Ghost Kernel Initializing..."}
+{"time":"2026-02-06T11:17:35.6686241-06:00","level":"INFO","msg":"gRPC Server listening","port":50051}
+{"time":"2026-02-06T11:17:35.6691669-06:00","level":"INFO","msg":"HTTP Gateway listening","port":8080}
+>>> [BODY] Started (PID: 9872)
+   Compiling ghost_sentinel v3.0.0 (C:\Developer\Ghost\body_rust)
+warning: associated function `new` is never used
+  --> src\accessibility.rs:22:12
+   |
+21 | impl UIElement {
+   | -------------- associated function in this implementation
+22 |     pub fn new(name: String, control_type: String, bounding_rectangle: String) -> Self {
+   |            ^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `walk_tree` is never used
+  --> src\accessibility.rs:32:8
+   |
+32 | pub fn walk_tree(
+   |        ^^^^^^^^^
+
+warning: function `get_current_name` is never used
+  --> src\accessibility.rs:62:4
+   |
+62 | fn get_current_name(element: &IUIAutomationElement) -> Result<String> {
+   |    ^^^^^^^^^^^^^^^^
+
+warning: function `get_current_control_type` is never used
+  --> src\accessibility.rs:69:4
+   |
+69 | fn get_current_control_type(element: &IUIAutomationElement) -> Result<String> {
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_current_bounding_rectangle` is never used
+  --> src\accessibility.rs:76:4
+   |
+76 | fn get_current_bounding_rectangle(element: &IUIAutomationElement) -> Result<String> {
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `get_child_elements` is never used
+  --> src\accessibility.rs:86:4
+   |
+86 | fn get_child_elements(element: &IUIAutomationElement) -> Result<Vec<IUIAutomationElement>> {
+   |    ^^^^^^^^^^^^^^^^^^
+
+warning: `ghost_sentinel` (bin "ghost_sentinel") generated 6 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.23s
+     Running `target\debug\ghost_sentinel.exe`
+[SENTINEL] Body Online. Connecting to Conscience...
+[SENTINEL] Connected to Nervous System.
+[SENTINEL] Vision Active. Streaming Focus...
+>>> [BRAIN] Started (PID: 27232)
+Traceback (most recent call last):
+  File "C:\Developer\Ghost\brain_python\main.py", line 21, in <module>
+    from brain.planner import GhostPlanner
+  File "C:\Developer\Ghost\brain_python\brain\__init__.py", line 3, in <module>
+    from .planner import GhostPlanner
+  File "C:\Developer\Ghost\brain_python\brain\planner.py", line 13, in <module>
+    import ollama
+ModuleNotFoundError: No module named 'ollama'
+>>> PROBING REST GATEWAY (localhost:8080)...
+>>> [RESPONSE] System State:
+{
+    "state":  "SHADOW",
+    "activeFocus":  "Stars A (8)"
+}
+>>> STOPPING SYSTEM...
+{"time":"2026-02-06T11:17:48.0523031-06:00","level":"WARN","msg":"Focus stream ended","error":"rpc error: code = Canceled desc = context canceled"}
+>>> [DONE] Verification Complete.
+{"time":"2026-02-06T11:24:33.3149331-06:00","level":"INFO","msg":"Shutting down..."}

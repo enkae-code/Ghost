@@ -18,7 +18,6 @@ try:
 except ImportError:
     winsound = None
 from colorama import init, Fore
-from bridge import SentinelBridge
 from brain.planner import GhostPlanner
 from gui.animations import TrayState
 from gui.tray import TrayIcon
