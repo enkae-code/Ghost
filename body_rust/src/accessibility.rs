@@ -1,13 +1,10 @@
 // Author: Enkae (enkae.dev@pm.me)
+#![allow(dead_code)]
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use windows::{
-    Win32::{
-        System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER},
-        UI::Accessibility::{
-            IUIAutomation, IUIAutomationElement, TreeScope_Children, CUIAutomation,
-        },
-    },
+use windows::Win32::{
+    System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER},
+    UI::Accessibility::{CUIAutomation, IUIAutomation, IUIAutomationElement, TreeScope_Children},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,11 +26,7 @@ impl UIElement {
     }
 }
 
-pub fn walk_tree(
-    element: &IUIAutomationElement,
-    depth: u32,
-    max_depth: u32,
-) -> Result<UIElement> {
+pub fn walk_tree(element: &IUIAutomationElement, depth: u32, max_depth: u32) -> Result<UIElement> {
     // Extract current element properties
     let name = get_current_name(element)?;
     let control_type = get_current_control_type(element)?;
@@ -85,21 +78,19 @@ fn get_current_bounding_rectangle(element: &IUIAutomationElement) -> Result<Stri
 
 fn get_child_elements(element: &IUIAutomationElement) -> Result<Vec<IUIAutomationElement>> {
     unsafe {
-        let automation: IUIAutomation = CoCreateInstance(
-            &CUIAutomation,
-            None,
-            CLSCTX_INPROC_SERVER,
-        )?;
-        let children_array = element.FindAll(TreeScope_Children, &automation.CreateTrueCondition()?)?;
-        
+        let automation: IUIAutomation =
+            CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)?;
+        let children_array =
+            element.FindAll(TreeScope_Children, &automation.CreateTrueCondition()?)?;
+
         let mut children = Vec::new();
         let length = children_array.Length()?;
-        
+
         for i in 0..length {
             let child = children_array.GetElement(i)?;
             children.push(child);
         }
-        
+
         Ok(children)
     }
 }

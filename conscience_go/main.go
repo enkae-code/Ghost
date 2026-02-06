@@ -42,16 +42,33 @@ func main() {
 	}
 	defer db.Close()
 
-	// 3. Initialize Adapters
-	actionRepo, _ := adapter.NewActionRepository(db)
-	intentRepo, _ := adapter.NewIntentHistoryRepository(db)
-	memoryRepo, _ := adapter.NewSQLiteRepository("data/kernel.db")
-	stateRepo, _ := adapter.NewStateRepository(db)
+	// 3. Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
 
-	// 4. Initialize Logic (The "Brain")
+	// 4. Initialize Adapters
+	actionRepo, err := adapter.NewActionRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to init ActionRepository: %v", err)
+	}
+	intentRepo, err := adapter.NewIntentHistoryRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to init IntentHistoryRepository: %v", err)
+	}
+	memoryRepo, err := adapter.NewSQLiteRepository("data/kernel.db")
+	if err != nil {
+		log.Fatalf("Failed to init MemoryRepository: %v", err)
+	}
+	stateRepo, err := adapter.NewStateRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to init StateRepository: %v", err)
+	}
+
+	// 5. Initialize Logic (The "Brain")
 	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
 
-	// 5. Start gRPC Server
+	// 6. Start gRPC Server
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
@@ -68,7 +85,7 @@ func main() {
 		}
 	}()
 
-	// 6. Start HTTP Gateway (REST Proxy)
+	// 7. Start HTTP Gateway (REST Proxy)
 	go func() {
 		ctx := context.Background()
 		ctx, cancel := context.WithCancel(ctx)
@@ -90,7 +107,7 @@ func main() {
 		}
 	}()
 
-	// 7. Wait for Shutdown
+	// 8. Wait for Shutdown
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
