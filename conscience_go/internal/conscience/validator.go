@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 // Package conscience implements the Ghost Conscience Kernel - the safety layer
 // that validates all actions before they are sent to the Body (Sentinel).
 //

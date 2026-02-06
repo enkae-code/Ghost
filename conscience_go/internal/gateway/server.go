@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 // Package gateway provides the WebSocket JSON-RPC 2.0 server for Ghost.
 // This is the unified control plane for VA Tactical, handling:
 // - Voice wake activation

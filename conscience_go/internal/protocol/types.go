@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 // Package protocol defines JSON-RPC 2.0 message types for the Ghost Gateway.
 // Based on Clawd Bot's protocol architecture, translated to Go for VA Tactical.
 package protocol

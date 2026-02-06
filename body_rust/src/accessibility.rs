@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use windows::{
