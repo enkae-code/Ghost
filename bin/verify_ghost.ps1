@@ -5,6 +5,11 @@
 
 Write-Host ">>> STARTING GHOST SYSTEM..." -ForegroundColor Cyan
 
+# Ensure we are running from project root
+$root = Join-Path $PSScriptRoot ".."
+Set-Location $root
+Write-Host ">>> Working Directory: $(Get-Location)" -ForegroundColor Gray
+
 # 1. Start CONSCIENCE (Kernel)
 $kernelProcess = Start-Process -FilePath "go" -ArgumentList "run main.go" -WorkingDirectory "conscience_go" -PassThru -NoNewWindow
 Write-Host ">>> [KERNEL] Started (PID: $($kernelProcess.Id))" -ForegroundColor Green
