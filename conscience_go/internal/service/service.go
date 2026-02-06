@@ -23,6 +23,7 @@ type GhostService struct {
 	IntentRepo *adapter.IntentHistoryRepository
 	MemoryRepo *adapter.SQLiteRepository
 	StateRepo  *adapter.StateRepository
+	Safety     *SafetyChecker
 
 	// Live State (Thread-Safe)
 	focusMu    sync.RWMutex
@@ -44,6 +45,7 @@ func NewGhostService(
 		IntentRepo: intentRepo,
 		MemoryRepo: memoryRepo,
 		StateRepo:  stateRepo,
+		Safety:     NewSafetyChecker(DefaultSafetyConfig()), // Use strict defaults by default
 		focusState: &pb.FocusState{WindowTitle: "Unknown"},
 		actionChan: make(chan *pb.ActionCommand, 100), // Buffer for safety
 	}
@@ -77,14 +79,13 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 	currentWindow := s.focusState.WindowTitle
 	s.focusMu.RUnlock()
 
-	// 2. Simple Heuristic Check (Placeholder for Policy Engine)
-	// In the future, this calls OPA (Open Policy Agent) or similar.
-
-	// Example: Deny "rm -rf" if not in safe mode (mock logic)
-	if req.Intent == "destructive_command" {
+	// 2. Safety Check (Policy Engine)
+	isDangerous, kw := s.Safety.IsDangerous(req.Intent)
+	if isDangerous {
+		slog.Warn("Safety Violation", "intent", req.Intent, "keyword", kw)
 		return &pb.PermissionResponse{
 			Approved: false,
-			Reason:   "Violates Safety Policy: Destructive Command",
+			Reason:   "Violates Safety Policy: Blocked Keyword '" + kw + "'",
 		}, nil
 	}
 
