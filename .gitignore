@@ -1,0 +1,62 @@
+# Ghost Polyglot Gitignore
+
+# Context
+.context/
+!.context/*.md
+.agent/
+!agent/
+brain/
+!brain/
+
+# Python (Brain)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+
+# Go (Conscience)
+conscience_go/conscience_go.exe
+conscience_go/conscience_go
+*.test
+*.prof
+
+# Rust (Body)
+body_rust/target/
+**/*.rs.bk
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local Config & Secrets
+config.json
+ghost.token
+*.log
+bin/config.json
+bin/ghost.token
+bin/audit.ps1
+
+# OS
+Thumbs.db
