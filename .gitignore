@@ -58,5 +58,12 @@ bin/config.json
 bin/ghost.token
 bin/audit.ps1
 
+# Temporary Logs
+*.out
+*.tmp
+pulse_output*.txt
+push_error.txt
+build_error.txt
+
 # OS
 Thumbs.db
