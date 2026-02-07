@@ -69,7 +69,7 @@ func main() {
 	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
 
 	// 6. Start gRPC Server
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *grpcPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -102,7 +102,7 @@ func main() {
 		}
 
 		slog.Info("HTTP Gateway listening", "port", *httpPort)
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", *httpPort), mux); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", *httpPort), mux); err != nil {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()

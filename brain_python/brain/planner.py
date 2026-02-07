@@ -1,5 +1,5 @@
-"""
 # // Author: Enkae (enkae.dev@pm.me)
+"""
 Ghost Planner - The Neuro-Symbolic Brain
 Translates natural language intent into structured action sequences.
 Includes security validation and localhost-only API enforcement.
