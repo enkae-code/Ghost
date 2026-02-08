@@ -20,7 +20,7 @@ jobs:
 
       # Requires JULES_API_KEY in Repo Settings > Secrets
       - name: Trigger Jules Agent
-        uses: google-labs-code/jules-action@v1
+        uses: google-labs-code/jules-action@v1.0.0
         with:
           api_key: ${{ secrets.JULES_API_KEY }}
           model: "gemini-2.0-pro-exp-02-05"
