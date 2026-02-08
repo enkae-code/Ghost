@@ -1,3 +1,4 @@
+// Author: Enkae (enkae.dev@pm.me)
 //go:build tools
 // +build tools
 

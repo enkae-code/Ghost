@@ -174,7 +174,7 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 }
 
 // evaluateActionRisk determines the risk level of a single action
-func (v *Validator) evaluateActionRisk(action *protocol.Action) protocol.RiskLevel {
+func (v *Validator) evaluateActionRisk(action *protocol.LegacyAction) protocol.RiskLevel {
 	// First check the action's declared risk level
 	if action.RiskLevel > protocol.RiskLevelNone {
 		return action.RiskLevel
@@ -190,7 +190,7 @@ func (v *Validator) evaluateActionRisk(action *protocol.Action) protocol.RiskLev
 }
 
 // containsBlockedKeyword checks if an action contains dangerous patterns
-func (v *Validator) containsBlockedKeyword(action *protocol.Action) bool {
+func (v *Validator) containsBlockedKeyword(action *protocol.LegacyAction) bool {
 	// Check target
 	targetLower := strings.ToLower(action.Target)
 	for _, keyword := range BlockedKeywords {
@@ -295,10 +295,10 @@ func (v *Validator) GetAuditLog(limit int) []AuditEntry {
 // RequestApproval handles incoming exec.request from the gateway
 func (v *Validator) RequestApproval(ctx context.Context, req *protocol.ExecApprovalRequestParams) (*protocol.ExecApprovalResult, error) {
 	// Convert to ActionValidationRequest
-	var actions []protocol.Action
+	var actions []protocol.LegacyAction
 	if err := json.Unmarshal(req.Actions, &actions); err != nil {
 		// Fallback: treat as single action
-		actions = []protocol.Action{{
+		actions = []protocol.LegacyAction{{
 			Type:      "UNKNOWN",
 			RiskLevel: protocol.RiskLevel(req.RiskLevel),
 		}}
