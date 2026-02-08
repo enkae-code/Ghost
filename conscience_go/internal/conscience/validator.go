@@ -110,14 +110,15 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 
 	// Calculate maximum risk level across all actions
 	maxRisk := protocol.RiskLevelNone
-	for i, action := range req.Actions {
-		actionRisk := v.evaluateActionRisk(&action)
+	for i := range req.Actions {
+		action := &req.Actions[i]
+		actionRisk := v.evaluateActionRisk(action)
 		if actionRisk > maxRisk {
 			maxRisk = actionRisk
 		}
 
 		// Check for blocked keywords in action payload
-		if v.containsBlockedKeyword(&action) {
+		if v.containsBlockedKeyword(action) {
 			result.Valid = false
 			result.Blocked = true
 			result.Reason = fmt.Sprintf("Action %d contains blocked keyword pattern", i)
