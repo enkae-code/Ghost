@@ -1,4 +1,4 @@
-# Author: Enkae (enkae.dev@pm.me)
+# // Author: Enkae (enkae.dev@pm.me)
 """
 Nerve - The gRPC Client wrapper for the Nervous System (Kernel).
 Handles connection management and type conversion.
