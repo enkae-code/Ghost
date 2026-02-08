@@ -85,24 +85,34 @@ func main() {
 		}
 	}()
 
-	// 7. Start HTTP Gateway (REST Proxy)
+	// 7. Start HTTP Gateway (REST Proxy + Dashboard)
 	go func() {
 		ctx := context.Background()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		mux := runtime.NewServeMux()
+		// API Mux (gRPC Gateway)
+		apiMux := runtime.NewServeMux()
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-
-		// Register the gateway to talk to the local gRPC server
 		endpoint := fmt.Sprintf("localhost:%d", *grpcPort)
-		err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, mux, endpoint, opts)
-		if err != nil {
+
+		if err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, apiMux, endpoint, opts); err != nil {
 			log.Fatalf("Failed to register gateway: %v", err)
 		}
 
-		slog.Info("HTTP Gateway listening", "port", *httpPort)
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", *httpPort), mux); err != nil {
+		// Root Mux (Static + API)
+		rootMux := http.NewServeMux()
+
+		// Mount API at /v1/
+		// Note: Ensure your proto files define paths starting with /v1/ or usage matches
+		rootMux.Handle("/v1/", apiMux)
+
+		// Mount Dashboard at /
+		fs := http.FileServer(http.Dir("./dashboard"))
+		rootMux.Handle("/", fs)
+
+		slog.Info("HTTP Gateway & Dashboard listening", "port", *httpPort, "url", fmt.Sprintf("http://localhost:%d", *httpPort))
+		if err := http.ListenAndServe(fmt.Sprintf(":%d", *httpPort), rootMux); err != nil {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()

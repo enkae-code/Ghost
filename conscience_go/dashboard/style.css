@@ -1,0 +1,176 @@
+:root {
+  --bg-void: #050505;
+  --glass-surface: rgba(255, 255, 255, 0.02);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --text-primary: #ededed;
+  --text-secondary: #888888;
+  --accent-glow: #7c3aed; /* Deep Linear Purple */
+  --hazard-red: #ef4444;
+  --font-stack:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-void);
+  background-image: radial-gradient(
+    circle at 50% 10%,
+    #151515 0%,
+    var(--bg-void) 70%
+  );
+  color: var(--text-primary);
+  font-family: var(--font-stack);
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.layout-grid {
+  width: 100%;
+  max-width: 1000px;
+  padding: 2rem;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 2rem;
+}
+
+/* HEADER */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 1rem;
+}
+.brand {
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  font-size: 1.1rem;
+}
+.badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--glass-border);
+  color: var(--text-secondary);
+}
+.badge.live {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+/* HERO: THE GHOST AVATAR */
+.hero-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 300px;
+}
+
+/* The Ghost SVG Animation */
+.ghost-svg {
+  width: 220px;
+  height: 220px;
+  filter: drop-shadow(0 0 30px rgba(124, 58, 237, 0.15));
+  transition: filter 0.5s ease;
+}
+.ghost-body {
+  fill: #e0e7ff;
+  animation: float 6s ease-in-out infinite;
+  transition: fill 0.5s ease;
+}
+.ghost-eyes {
+  fill: #0a0a0a;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+/* STATE: THINKING */
+.hero-section.thinking .ghost-body {
+  fill: var(--accent-glow);
+}
+.hero-section.thinking .ghost-svg {
+  filter: drop-shadow(0 0 50px rgba(124, 58, 237, 0.6));
+}
+
+.status-label {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* DATA CARDS */
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.glass-card {
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-content {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+.empty {
+  font-style: italic;
+  color: var(--text-secondary);
+  opacity: 0.5;
+}
+
+/* KILL SWITCH */
+.controls {
+  display: flex;
+  justify-content: flex-end;
+}
+.kill-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--hazard-red);
+  color: var(--hazard-red);
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kill-btn:hover {
+  background: var(--hazard-red);
+  color: #000;
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.4);
+}
