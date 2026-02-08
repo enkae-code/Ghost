@@ -35,17 +35,17 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	slog.Info("Ghost Kernel Initializing...")
 
-	// 2. Database Setup
+	// 2. Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
+	}
+
+	// 3. Database Setup
 	db, err := sql.Open("sqlite", "data/kernel.db")
 	if err != nil {
 		log.Fatalf("Failed to open DB: %v", err)
 	}
 	defer db.Close()
-
-	// 3. Ensure data directory exists
-	if err := os.MkdirAll("data", 0755); err != nil {
-		log.Fatalf("Failed to create data directory: %v", err)
-	}
 
 	// 4. Initialize Adapters
 	actionRepo, err := adapter.NewActionRepository(db)
@@ -69,7 +69,8 @@ func main() {
 	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
 
 	// 6. Start gRPC Server
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
+	grpcAddr := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
+	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -79,7 +80,7 @@ func main() {
 
 	// Run gRPC in goroutine
 	go func() {
-		slog.Info("gRPC Server listening", "port", *grpcPort)
+		slog.Info("gRPC Server listening", "addr", grpcAddr)
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("Failed to serve gRPC: %v", err)
 		}
@@ -94,25 +95,17 @@ func main() {
 		// API Mux (gRPC Gateway)
 		apiMux := runtime.NewServeMux()
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
-		endpoint := fmt.Sprintf("localhost:%d", *grpcPort)
 
-		if err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, apiMux, endpoint, opts); err != nil {
+		// Register the gateway to talk to the local gRPC server
+		endpoint := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
+		err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, apiMux, endpoint, opts)
+		if err != nil {
 			log.Fatalf("Failed to register gateway: %v", err)
 		}
 
-		// Root Mux (Static + API)
-		rootMux := http.NewServeMux()
-
-		// Mount API at /v1/
-		// Note: Ensure your proto files define paths starting with /v1/ or usage matches
-		rootMux.Handle("/v1/", apiMux)
-
-		// Mount Dashboard at /
-		fs := http.FileServer(http.Dir("./dashboard"))
-		rootMux.Handle("/", fs)
-
-		slog.Info("HTTP Gateway & Dashboard listening", "port", *httpPort, "url", fmt.Sprintf("http://localhost:%d", *httpPort))
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", *httpPort), rootMux); err != nil {
+		httpAddr := fmt.Sprintf("127.0.0.1:%d", *httpPort)
+		slog.Info("HTTP Gateway listening", "addr", httpAddr)
+		if err := http.ListenAndServe(httpAddr, apiMux); err != nil {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()
