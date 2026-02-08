@@ -24,6 +24,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	// MalformedJSONFallback is used as Target when request unmarshaling fails
+	MalformedJSONFallback = "MALFORMED_JSON_FALLBACK"
+)
+
 // BlockedKeywords are patterns that trigger automatic rejection
 var BlockedKeywords = []string{
 	"password", "credential", "secret", "api_key", "token",
@@ -98,17 +103,7 @@ func (v *Validator) SetFocusedWindow(window string) {
 
 // ValidateAction is the core function - ALL actions MUST pass through here
 func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionValidationRequest) *protocol.ActionValidationResult {
-	v.mu.Lock()
-	defer v.mu.Unlock()
-
-	result := &protocol.ActionValidationResult{
-		Valid:      true,
-		Blocked:    false,
-		Override:   req.Override,
-		TrustScore: v.getTrustScore(req.Intent),
-	}
-
-	// Calculate maximum risk level across all actions
+	// 1. Calculate maximum risk level and check blocked keywords (No lock needed)
 	maxRisk := protocol.RiskLevelNone
 	for i, action := range req.Actions {
 		actionRisk := v.evaluateActionRisk(&action)
@@ -118,16 +113,32 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 
 		// Check for blocked keywords in action payload
 		if v.containsBlockedKeyword(&action) {
-			result.Valid = false
-			result.Blocked = true
-			result.Reason = fmt.Sprintf("Action %d contains blocked keyword pattern", i)
-			result.RiskLevel = protocol.RiskLevelCritical
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			result := &protocol.ActionValidationResult{
+				Valid:      false,
+				Blocked:    true,
+				Override:   req.Override,
+				TrustScore: v.getTrustScore(req.Intent),
+				Reason:     fmt.Sprintf("Action %d contains blocked keyword pattern", i),
+				RiskLevel:  protocol.RiskLevelCritical,
+			}
 			v.logAudit(req, result)
 			return result
 		}
 	}
 
-	result.RiskLevel = maxRisk
+	// 2. State-dependent validation (Lock needed)
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	result := &protocol.ActionValidationResult{
+		Valid:      true,
+		Blocked:    false,
+		Override:   req.Override,
+		TrustScore: v.getTrustScore(req.Intent),
+		RiskLevel:  maxRisk,
+	}
 
 	// Rule: RiskLevel > High (7+) requires Override
 	if maxRisk >= protocol.RiskLevelHigh && !req.Override {
@@ -174,7 +185,7 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 }
 
 // evaluateActionRisk determines the risk level of a single action
-func (v *Validator) evaluateActionRisk(action *protocol.Action) protocol.RiskLevel {
+func (v *Validator) evaluateActionRisk(action *protocol.LegacyAction) protocol.RiskLevel {
 	// First check the action's declared risk level
 	if action.RiskLevel > protocol.RiskLevelNone {
 		return action.RiskLevel
@@ -190,7 +201,7 @@ func (v *Validator) evaluateActionRisk(action *protocol.Action) protocol.RiskLev
 }
 
 // containsBlockedKeyword checks if an action contains dangerous patterns
-func (v *Validator) containsBlockedKeyword(action *protocol.Action) bool {
+func (v *Validator) containsBlockedKeyword(action *protocol.LegacyAction) bool {
 	// Check target
 	targetLower := strings.ToLower(action.Target)
 	for _, keyword := range BlockedKeywords {
@@ -295,12 +306,15 @@ func (v *Validator) GetAuditLog(limit int) []AuditEntry {
 // RequestApproval handles incoming exec.request from the gateway
 func (v *Validator) RequestApproval(ctx context.Context, req *protocol.ExecApprovalRequestParams) (*protocol.ExecApprovalResult, error) {
 	// Convert to ActionValidationRequest
-	var actions []protocol.Action
+	var actions []protocol.LegacyAction
 	if err := json.Unmarshal(req.Actions, &actions); err != nil {
 		// Fallback: treat as single action
-		actions = []protocol.Action{{
+		// Include raw actions in payload to ensure keyword checking still happens
+		actions = []protocol.LegacyAction{{
 			Type:      "UNKNOWN",
 			RiskLevel: protocol.RiskLevel(req.RiskLevel),
+			Target:    MalformedJSONFallback,
+			Payload:   req.Actions,
 		}}
 	}
 
