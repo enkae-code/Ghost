@@ -105,14 +105,15 @@ func (v *Validator) SetFocusedWindow(window string) {
 func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionValidationRequest) *protocol.ActionValidationResult {
 	// 1. Calculate maximum risk level and check blocked keywords (No lock needed)
 	maxRisk := protocol.RiskLevelNone
-	for i, action := range req.Actions {
-		actionRisk := v.evaluateActionRisk(&action)
+	for i := range req.Actions {
+		action := &req.Actions[i]
+		actionRisk := v.evaluateActionRisk(action)
 		if actionRisk > maxRisk {
 			maxRisk = actionRisk
 		}
 
 		// Check for blocked keywords in action payload
-		if v.containsBlockedKeyword(&action) {
+		if v.containsBlockedKeyword(action) {
 			v.mu.Lock()
 			defer v.mu.Unlock()
 			result := &protocol.ActionValidationResult{

@@ -96,7 +96,7 @@ func main() {
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 		// Register the gateway to talk to the local gRPC server
-		endpoint := fmt.Sprintf("localhost:%d", *grpcPort)
+		endpoint := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
 		err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, mux, endpoint, opts)
 		if err != nil {
 			log.Fatalf("Failed to register gateway: %v", err)
