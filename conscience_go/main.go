@@ -69,7 +69,7 @@ func main() {
 	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
 
 	// 6. Start gRPC Server
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *grpcPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *grpcPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -95,14 +95,14 @@ func main() {
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 		// Register the gateway to talk to the local gRPC server
-		endpoint := fmt.Sprintf("localhost:%d", *grpcPort)
+		endpoint := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
 		err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, mux, endpoint, opts)
 		if err != nil {
 			log.Fatalf("Failed to register gateway: %v", err)
 		}
 
 		slog.Info("HTTP Gateway listening", "port", *httpPort)
-		if err := http.ListenAndServe(fmt.Sprintf(":%d", *httpPort), mux); err != nil {
+		if err := http.ListenAndServe(fmt.Sprintf("127.0.0.1:%d", *httpPort), mux); err != nil {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()
