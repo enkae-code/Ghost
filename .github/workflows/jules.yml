@@ -1,0 +1,39 @@
+name: Jules Sentinel (Push Audit)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  jules_audit:
+    runs-on: ubuntu-latest
+    name: "Jules: Architect Review"
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Requires JULES_API_KEY in Repo Settings > Secrets
+      - name: Trigger Jules Agent
+        uses: google-labs-code/jules-action@v1
+        with:
+          api_key: ${{ secrets.JULES_API_KEY }}
+          model: "gemini-2.0-pro-exp-02-05"
+          prompt: >
+            ROLE: You are Jules, the Gatekeeper.
+
+            PROJECT CONSTRAINTS:
+            - STRICTLY OFFLINE (No external network calls allowed).
+            - ZERO TELEMETRY (No analytics or tracking).
+            - WCAG 2.1 AA (Accessibility compliance).
+
+            YOUR TASK:
+            1. Audit this commit for any violations of the constraints above.
+            2. Check for "slop" (unused imports, console.logs, vague variable names).
+            3. If a bug is found, fix it directly or comment on the line.
+            4. If clean, comment "✅ Sentinel Pass".
