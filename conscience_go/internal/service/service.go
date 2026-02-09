@@ -90,6 +90,16 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 		}, nil
 	}
 
+	// 2b. Action Validation
+	valid, reason := s.Safety.ValidateActions(req.Actions)
+	if !valid {
+		slog.Warn("Action Validation Failed", "reason", reason)
+		return &pb.PermissionResponse{
+			Approved: false,
+			Reason:   "Action Validation Failed: " + reason,
+		}, nil
+	}
+
 	// 3. Log Intent
 	// Note: We perform this async or ignore error to not block latency
 	go func() {
