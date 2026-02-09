@@ -90,7 +90,17 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 		}, nil
 	}
 
-	// 3. Log Intent
+	// 3. Action Validation (Security Kernel)
+	isValid, reason := s.Safety.ValidateActions(req.Actions)
+	if !isValid {
+		slog.Warn("Action Validation Failed", "intent", req.Intent, "reason", reason)
+		return &pb.PermissionResponse{
+			Approved: false,
+			Reason:   "Violates Safety Policy: " + reason,
+		}, nil
+	}
+
+	// 4. Log Intent
 	// Note: We perform this async or ignore error to not block latency
 	go func() {
 		// Adapt this call to your specific IntentRepo method signature
