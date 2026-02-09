@@ -3,6 +3,8 @@ package service
 
 import (
 	"testing"
+
+	pb "ghost/kernel/internal/protocol"
 )
 
 func TestIsDangerous(t *testing.T) {
@@ -71,6 +73,80 @@ func TestIsDangerous(t *testing.T) {
 
 			if kw != tt.expectedKw {
 				t.Errorf("%s\nExpected Keyword: %q, Got: %q", tt.description, tt.expectedKw, kw)
+			}
+		})
+	}
+}
+
+func TestValidateActions(t *testing.T) {
+	checker := NewSafetyChecker(DefaultSafetyConfig())
+
+	tests := []struct {
+		name          string
+		actions       []*pb.Action
+		expectedValid bool
+		expectedReason string
+	}{
+		{
+			name:          "Nil actions slice",
+			actions:       nil,
+			expectedValid: true,
+		},
+		{
+			name:          "Empty actions slice",
+			actions:       []*pb.Action{},
+			expectedValid: true,
+		},
+		{
+			name: "Single valid action",
+			actions: []*pb.Action{
+				{Type: "CLICK"},
+			},
+			expectedValid: true,
+		},
+		{
+			name: "Multiple valid actions",
+			actions: []*pb.Action{
+				{Type: "TYPE"},
+				{Type: "WAIT"},
+			},
+			expectedValid: true,
+		},
+		{
+			name: "Action with nil element",
+			actions: []*pb.Action{
+				{Type: "CLICK"},
+				nil,
+			},
+			expectedValid: false,
+			expectedReason: "Nil action in request",
+		},
+		{
+			name: "Blocked action type EXEC",
+			actions: []*pb.Action{
+				{Type: "EXEC"},
+			},
+			expectedValid: false,
+			expectedReason: "Direct execution (EXEC/SHELL) is prohibited for safety",
+		},
+		{
+			name: "Blocked action type SHELL",
+			actions: []*pb.Action{
+				{Type: "SHELL"},
+			},
+			expectedValid: false,
+			expectedReason: "Direct execution (EXEC/SHELL) is prohibited for safety",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			valid, reason := checker.ValidateActions(tt.actions)
+			if valid != tt.expectedValid {
+				t.Errorf("ValidateActions() valid = %v, want %v", valid, tt.expectedValid)
+			}
+			if tt.expectedReason != "" && reason != tt.expectedReason {
+				t.Errorf("ValidateActions() reason = %q, want %q", reason, tt.expectedReason)
 			}
 		})
 	}
