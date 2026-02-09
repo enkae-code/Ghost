@@ -86,25 +86,26 @@ func main() {
 		}
 	}()
 
-	// 7. Start HTTP Gateway (REST Proxy)
+	// 7. Start HTTP Gateway (REST Proxy + Dashboard)
 	go func() {
 		ctx := context.Background()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		mux := runtime.NewServeMux()
+		// API Mux (gRPC Gateway)
+		apiMux := runtime.NewServeMux()
 		opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
 
 		// Register the gateway to talk to the local gRPC server
 		endpoint := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
-		err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, mux, endpoint, opts)
+		err := pb.RegisterNervousSystemHandlerFromEndpoint(ctx, apiMux, endpoint, opts)
 		if err != nil {
 			log.Fatalf("Failed to register gateway: %v", err)
 		}
 
 		httpAddr := fmt.Sprintf("127.0.0.1:%d", *httpPort)
 		slog.Info("HTTP Gateway listening", "addr", httpAddr)
-		if err := http.ListenAndServe(httpAddr, mux); err != nil {
+		if err := http.ListenAndServe(httpAddr, apiMux); err != nil {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()

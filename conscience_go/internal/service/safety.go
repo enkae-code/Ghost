@@ -65,13 +65,19 @@ func (s *SafetyChecker) IsDangerous(intent string) (bool, string) {
 	return false, ""
 }
 
-// ValidateActions checks a slice of actions against safety policies.
+// ValidateActions validates a slice of actions for safety, checking for nil elements
 func (s *SafetyChecker) ValidateActions(actions []*pb.Action) (bool, string) {
 	if !s.config.SafeMode {
 		return true, ""
 	}
+	if actions == nil {
+		return true, ""
+	}
 
 	for _, action := range actions {
+		if action == nil {
+			return false, "Nil action in request"
+		}
 		if ok, reason := s.ValidateAction(action); !ok {
 			return false, reason
 		}
@@ -80,18 +86,27 @@ func (s *SafetyChecker) ValidateActions(actions []*pb.Action) (bool, string) {
 	return true, ""
 }
 
-// ValidateAction checks a single action against safety policies.
+// ValidateAction checks if a single action is safe and allowed
 func (s *SafetyChecker) ValidateAction(action *pb.Action) (bool, string) {
 	if !s.config.SafeMode {
 		return true, ""
 	}
+	if action == nil {
+		return false, "Nil action in request"
+	}
 
+	// Basic safety check: reject direct shell execution (from main)
 	actionType := strings.ToUpper(action.Type)
+	if actionType == "EXEC" || actionType == "SHELL" {
+		return false, "Direct execution (EXEC/SHELL) is prohibited for safety"
+	}
+
+	// Policy check: Allowlist (from security-hardening)
 	if !s.config.AllowedActions[actionType] {
 		return false, "Action type '" + actionType + "' is not in the allowlist"
 	}
 
-	// Path safety checks for filesystem actions
+	// Path safety checks for filesystem actions (from security-hardening)
 	switch actionType {
 	case "WRITE", "READ", "EDIT":
 		path := action.Payload["path"]

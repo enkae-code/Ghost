@@ -103,6 +103,13 @@ func (v *Validator) SetFocusedWindow(window string) {
 
 // ValidateAction is the core function - ALL actions MUST pass through here
 func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionValidationRequest) *protocol.ActionValidationResult {
+	if req == nil {
+		return &protocol.ActionValidationResult{
+			Valid:   false,
+			Blocked: true,
+			Reason:  "Nil validation request",
+		}
+	}
 	// 1. Calculate maximum risk level and check blocked keywords (No lock needed)
 	maxRisk := protocol.RiskLevelNone
 	for i := range req.Actions {
@@ -187,6 +194,9 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 
 // evaluateActionRisk determines the risk level of a single action
 func (v *Validator) evaluateActionRisk(action *protocol.LegacyAction) protocol.RiskLevel {
+	if action == nil {
+		return protocol.RiskLevelNone
+	}
 	// First check the action's declared risk level
 	if action.RiskLevel > protocol.RiskLevelNone {
 		return action.RiskLevel
@@ -203,6 +213,9 @@ func (v *Validator) evaluateActionRisk(action *protocol.LegacyAction) protocol.R
 
 // containsBlockedKeyword checks if an action contains dangerous patterns
 func (v *Validator) containsBlockedKeyword(action *protocol.LegacyAction) bool {
+	if action == nil {
+		return false
+	}
 	// Check target
 	targetLower := strings.ToLower(action.Target)
 	for _, keyword := range BlockedKeywords {
