@@ -19,18 +19,23 @@ import (
 type GhostService struct {
 	pb.UnimplementedNervousSystemServer
 
-	// Dependencies
+	// ActionRepo is the repository for action-related data.
 	ActionRepo *adapter.ActionRepository
+	// IntentRepo is the repository for intent history.
 	IntentRepo *adapter.IntentHistoryRepository
+	// MemoryRepo is the repository for system memory (SQLite).
 	MemoryRepo *adapter.SQLiteRepository
-	StateRepo  *adapter.StateRepository
-	Safety     *SafetyChecker
+	// StateRepo is the repository for system state.
+	StateRepo *adapter.StateRepository
+	// Safety is the safety checker for intents and actions.
+	Safety *SafetyChecker
 
-	// Live State (Thread-Safe)
-	focusMu    sync.RWMutex
+	// focusMu protects focusState.
+	focusMu sync.RWMutex
+	// focusState stores the current focus information from the Sentinel.
 	focusState *pb.FocusState
 
-	// Action Stream (for sending commands to Body)
+	// actionChan is a buffered channel for sending action commands to the Body.
 	actionChan chan *pb.ActionCommand
 }
 
@@ -72,6 +77,7 @@ func (s *GhostService) ReportFocus(stream pb.NervousSystem_ReportFocusServer) er
 
 // --- COGNITION ---
 
+// RequestPermission evaluates a request from the Brain to perform actions.
 func (s *GhostService) RequestPermission(ctx context.Context, req *pb.PermissionRequest) (*pb.PermissionResponse, error) {
 	slog.Info("Permission Request", "intent", req.Intent, "trace_id", req.TraceId)
 
@@ -90,17 +96,16 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 		}, nil
 	}
 
-	// 2b. Action Validation
-	valid, reason := s.Safety.ValidateActions(req.Actions)
-	if !valid {
-		slog.Warn("Action Validation Failed", "reason", reason)
+	// 3. Action Validation
+	if ok, reason := s.Safety.ValidateActions(req.Actions); !ok {
+		slog.Warn("Action Validation Failed", "reason", reason, "trace_id", req.TraceId)
 		return &pb.PermissionResponse{
 			Approved: false,
-			Reason:   "Action Validation Failed: " + reason,
+			Reason:   "Safety Violation: " + reason,
 		}, nil
 	}
 
-	// 3. Log Intent
+	// 4. Log Intent
 	// Note: We perform this async or ignore error to not block latency
 	go func() {
 		// Adapt this call to your specific IntentRepo method signature
