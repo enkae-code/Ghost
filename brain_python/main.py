@@ -35,6 +35,10 @@ class PiperEngine:
 
     def say(self, text: str):
         if not text: return
+
+        if not os.path.exists(self.bin_path):
+            print(Fore.RED + f"[VOICE] Piper binary not found at {self.bin_path}")
+            return
         
         # Clean text for command line safety
         text = text.replace('"', '').replace('\n', ' ')
@@ -258,20 +262,26 @@ class Ghost:
                     return token
             
             # Generate new token (32 random bytes as hex)
-            # Generate new token (32 random bytes as hex)
             import secrets
             token = secrets.token_hex(32)
-            # Default to root if neither exists
-            write_target = token_file 
-            write_target.write_text(token)
-            write_target.chmod(0o600)  # Restrict permissions
-            self.logger.info("Generated new auth token: ghost.token")
+
+            # Try to persist the token
+            try:
+                # Default to root if neither exists
+                write_target = token_file
+                write_target.write_text(token)
+                write_target.chmod(0o600)  # Restrict permissions
+                self.logger.info("Generated new auth token: ghost.token")
+            except Exception as write_err:
+                self.logger.warning(f"Failed to persist token: {write_err}. Using in-memory token.")
+
             return token
         
         except Exception as e:
             self.logger.error(f"Failed to load/generate token: {e}")
-            # Return a fallback token (not secure, but allows operation)
-            return "0" * 64
+            # Fallback to secure in-memory token if everything fails
+            import secrets
+            return secrets.token_hex(32)
     
     def _request_kernel(self, request: dict) -> dict | None:
         """

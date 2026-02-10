@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
@@ -105,7 +106,17 @@ func main() {
 
 		httpAddr := fmt.Sprintf("127.0.0.1:%d", *httpPort)
 		slog.Info("HTTP Gateway listening", "addr", httpAddr)
-		if err := http.ListenAndServe(httpAddr, apiMux); err != nil {
+
+		server := &http.Server{
+			Addr:              httpAddr,
+			Handler:           apiMux,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      15 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()
