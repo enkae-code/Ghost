@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
@@ -133,8 +134,30 @@ func main() {
 		}))
 
 		httpAddr := fmt.Sprintf("127.0.0.1:%d", *httpPort)
-		slog.Info("HTTP Gateway listening", "addr", httpAddr, "static", "./dashboard/landing/dist")
-		if err := http.ListenAndServe(httpAddr, rootMux); err != nil {
+		slog.Info("HTTP Gateway listening", "addr", httpAddr, "static", staticDir)
+
+		// CORS middleware for frontend dashboard
+		corsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			rootMux.ServeHTTP(w, r)
+		})
+
+		server := &http.Server{
+			Addr:              httpAddr,
+			Handler:           corsHandler,
+			ReadHeaderTimeout: 5 * time.Second,
+			ReadTimeout:       10 * time.Second,
+			WriteTimeout:      15 * time.Second,
+			IdleTimeout:       60 * time.Second,
+		}
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to serve HTTP: %v", err)
 		}
 	}()
