@@ -72,7 +72,7 @@ impl Effector {
     }
 
     /// Types text into the focused window
-    fn execute_type_text(&mut self, payload: &serde_json::Value) -> Result<()> {
+    pub fn execute_type_text(&mut self, payload: &serde_json::Value) -> Result<()> {
         let text = payload
             .get("text")
             .and_then(|v| v.as_str())
@@ -94,7 +94,7 @@ impl Effector {
     }
 
     /// Clicks the mouse at specified coordinates
-    fn execute_click(&mut self, payload: &serde_json::Value) -> Result<()> {
+    pub fn execute_click(&mut self, payload: &serde_json::Value) -> Result<()> {
         let x = payload
             .get("x")
             .and_then(|v| v.as_i64())
@@ -129,14 +129,45 @@ impl Effector {
         Ok(())
     }
 
-    /// Presses a specific key
-    fn execute_press_key(&mut self, payload: &serde_json::Value) -> Result<()> {
+    /// Presses a specific key (supports combo keys like "win+r", "ctrl+k")
+    pub fn execute_press_key(&mut self, payload: &serde_json::Value) -> Result<()> {
         let key_str = payload
             .get("key")
             .and_then(|v| v.as_str())
             .context("Missing 'key' field in payload")?;
 
         println!("[EFFECTOR]    Pressing key: {}", key_str);
+
+        // Handle combo keys like "win+r", "ctrl+k"
+        if key_str.contains('+') {
+            let parts: Vec<&str> = key_str.split('+').collect();
+            let mut keys_to_press: Vec<Key> = Vec::new();
+
+            for part in &parts {
+                let k = match part.trim().to_uppercase().as_str() {
+                    "WIN" | "GUI" | "META" | "WINDOWS" => Key::Meta,
+                    "CTRL" | "CONTROL" => Key::Control,
+                    "ALT" => Key::Alt,
+                    "SHIFT" => Key::Shift,
+                    s if s.len() == 1 => Key::Unicode(s.chars().next().unwrap()),
+                    other => anyhow::bail!("Unknown combo key part: {}", other),
+                };
+                keys_to_press.push(k);
+            }
+
+            // Press all keys down
+            for k in &keys_to_press {
+                self.enigo.key(*k, Direction::Press)
+                    .context("Failed to press combo key")?;
+            }
+            // Release in reverse order
+            for k in keys_to_press.iter().rev() {
+                self.enigo.key(*k, Direction::Release)
+                    .context("Failed to release combo key")?;
+            }
+
+            return Ok(());
+        }
 
         // Map string to Key enum
         let key = match key_str.to_uppercase().as_str() {
@@ -222,59 +253,8 @@ fn sanitize_text(input: &str) -> String {
         .collect()
 }
 
-/// Polls the Go API for approved actions and executes them
-pub fn effector_loop(api_base_url: &str) {
-    println!("[EFFECTOR] Starting execution loop...");
-    println!("[EFFECTOR] Polling: {}/api/actions/approved", api_base_url);
-
-    let mut effector = match Effector::new() {
-        Ok(e) => e,
-        Err(err) => {
-            eprintln!("[EFFECTOR] Failed to initialize: {}", err);
-            return;
-        }
-    };
-
-    let poll_url = format!("{}/api/actions/approved", api_base_url);
-    let client = reqwest::blocking::Client::new();
-
-    loop {
-        thread::sleep(Duration::from_millis(500));
-
-        // Poll for approved actions
-        let response = match client.get(&poll_url).send() {
-            Ok(r) => r,
-            Err(err) => {
-                eprintln!("[EFFECTOR] Failed to poll API: {}", err);
-                continue;
-            }
-        };
-
-        if !response.status().is_success() {
-            eprintln!("[EFFECTOR] API error: {}", response.status());
-            continue;
-        }
-
-        let actions: Vec<ActionProposal> = match response.json() {
-            Ok(a) => a,
-            Err(err) => {
-                eprintln!("[EFFECTOR] Failed to parse actions: {}", err);
-                continue;
-            }
-        };
-
-        // Execute each approved action
-        for action in actions {
-            println!("[SENTINEL] Receiving approved action: {}", action.id);
-
-            if let Err(err) = effector.execute_action(&action) {
-                eprintln!("[EFFECTOR] ✗ Failed to execute action {}: {}", action.id, err);
-            } else {
-                println!("[EFFECTOR] ✓ Action {} completed successfully", action.id);
-            }
-        }
-    }
-}
+// NOTE: effector_loop (old HTTP polling approach) removed.
+// Actions now arrive via gRPC StreamActions in main.rs.
 
 #[cfg(test)]
 mod tests {

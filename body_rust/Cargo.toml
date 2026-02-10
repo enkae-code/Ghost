@@ -20,6 +20,7 @@ windows = { version = "0.52", features = [
     "Win32_System_Ole",
 ] }
 anyhow = "1.0"
+enigo = "0.2"
 
 [build-dependencies]
 tonic-build = "0.10"
