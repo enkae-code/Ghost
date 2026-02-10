@@ -253,59 +253,8 @@ fn sanitize_text(input: &str) -> String {
         .collect()
 }
 
-/// Polls the Go API for approved actions and executes them
-pub fn effector_loop(api_base_url: &str) {
-    println!("[EFFECTOR] Starting execution loop...");
-    println!("[EFFECTOR] Polling: {}/api/actions/approved", api_base_url);
-
-    let mut effector = match Effector::new() {
-        Ok(e) => e,
-        Err(err) => {
-            eprintln!("[EFFECTOR] Failed to initialize: {}", err);
-            return;
-        }
-    };
-
-    let poll_url = format!("{}/api/actions/approved", api_base_url);
-    let client = reqwest::blocking::Client::new();
-
-    loop {
-        thread::sleep(Duration::from_millis(500));
-
-        // Poll for approved actions
-        let response = match client.get(&poll_url).send() {
-            Ok(r) => r,
-            Err(err) => {
-                eprintln!("[EFFECTOR] Failed to poll API: {}", err);
-                continue;
-            }
-        };
-
-        if !response.status().is_success() {
-            eprintln!("[EFFECTOR] API error: {}", response.status());
-            continue;
-        }
-
-        let actions: Vec<ActionProposal> = match response.json() {
-            Ok(a) => a,
-            Err(err) => {
-                eprintln!("[EFFECTOR] Failed to parse actions: {}", err);
-                continue;
-            }
-        };
-
-        // Execute each approved action
-        for action in actions {
-            println!("[SENTINEL] Receiving approved action: {}", action.id);
-
-            if let Err(err) = effector.execute_action(&action) {
-                eprintln!("[EFFECTOR] ✗ Failed to execute action {}: {}", action.id, err);
-            } else {
-                println!("[EFFECTOR] ✓ Action {} completed successfully", action.id);
-            }
-        }
-    }
-}
+// NOTE: effector_loop (old HTTP polling approach) removed.
+// Actions now arrive via gRPC StreamActions in main.rs.
 
 #[cfg(test)]
 mod tests {
