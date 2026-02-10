@@ -110,6 +110,11 @@ func (s *Server) registerHandlers() {
 
 // Start begins listening for connections
 func (s *Server) Start(ctx context.Context) error {
+	// Security: Enforce localhost binding if host is empty or 0.0.0.0
+	if s.host == "" || s.host == "0.0.0.0" {
+		s.host = "127.0.0.1"
+	}
+
 	listenAddr := fmt.Sprintf("%s:%d", s.host, s.port)
 	listener, err := net.Listen("tcp", listenAddr)
 	if err != nil {
@@ -154,7 +159,14 @@ func (s *Server) handleConnection(ctx context.Context, conn net.Conn) {
 
 	scanner := bufio.NewScanner(conn)
 
-	for scanner.Scan() {
+	for {
+		// Set read deadline to prevent hanging connections (heartbeat is 30s)
+		conn.SetReadDeadline(time.Now().Add(65 * time.Second))
+
+		if !scanner.Scan() {
+			break
+		}
+
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
 			continue

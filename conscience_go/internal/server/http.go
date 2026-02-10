@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"ghost/kernel/internal/adapter"
 	"ghost/kernel/internal/domain"
@@ -375,7 +376,17 @@ func (s *Server) handleStream(w http.ResponseWriter, r *http.Request) {
 // Start launches the HTTP server on the specified address
 func (s *Server) Start(addr string) error {
 	log.Printf("HTTP server starting on %s", addr)
-	return http.ListenAndServe(addr, s.mux)
+
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           s.mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      15 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	return server.ListenAndServe()
 }
 
 // ========================================
