@@ -79,6 +79,51 @@ except ImportError:
 
 init(autoreset=True)
 
+
+class SentinelBridge:
+    """Bridge to Body (Rust Sentinel). Falls back to local pyautogui if Body offline."""
+
+    def __init__(self):
+        self.output_queue = queue.Queue()
+        self._pyautogui = None
+        try:
+            import pyautogui
+            pyautogui.FAILSAFE = True
+            pyautogui.PAUSE = 0.1
+            self._pyautogui = pyautogui
+        except ImportError:
+            pass
+
+    def wake(self, mode="hybrid"):
+        print(Fore.GREEN + "[SENTINEL] SentinelBridge initialized (demo mode)")
+        return True
+
+    def type_text(self, text):
+        print(Fore.CYAN + f"[HANDS] Typing: {text}")
+        if self._pyautogui:
+            self._pyautogui.write(text, interval=0.02)
+
+    def press_key(self, key):
+        print(Fore.CYAN + f"[HANDS] Key: {key}")
+        if self._pyautogui:
+            if '+' in key:
+                keys = [k.strip().lower() for k in key.split('+')]
+                self._pyautogui.hotkey(*keys)
+            else:
+                self._pyautogui.press(key.lower())
+
+    def click(self, x, y):
+        print(Fore.CYAN + f"[HANDS] Click: ({x}, {y})")
+        if self._pyautogui:
+            self._pyautogui.click(x, y)
+
+    def scan_full_tree(self):
+        return {"name": "Desktop", "control_type": "Window", "children": []}
+
+    def kill(self):
+        pass
+
+
 class Ghost:
     """
     Ghost - Voice-Enabled Digital Proxy
@@ -425,15 +470,25 @@ class Ghost:
             if "mute" in intent.lower(): self.silent_mode = True
             elif "unmute" in intent.lower(): self.silent_mode = False
 
+            # --- PERMISSION GATE: Ask Conscience Kernel ---
+            physical_actions = [a for a in actions if a.get("type", "").upper() in ("KEY", "TYPE", "CLICK", "WRITE")]
+            if physical_actions:
+                print(Fore.CYAN + f"[CONSCIENCE] Requesting permission for {len(physical_actions)} action(s)...")
+                permission = self._request_permission(intent, physical_actions, trace_id=trace_id)
+                if not permission.get("approved", False):
+                    print(Fore.RED + f"[CONSCIENCE] BLOCKED: {permission.get('reason', 'Unknown')}")
+                    self._update_tray_state(TrayState.IDLE)
+                    return
+
             print(Fore.GREEN + f"[HANDS] Executing {len(actions)} action(s)...")
-            
+
             # LOGICALLY MUTE EARS
             self.voice_paused = True
-            
+
             try:
                 for i, action in enumerate(actions, 1):
                     action_type = action.get("type", "").upper()
-                    
+
                     if action_type == "SPEAK":
                         text = action.get("text", "")
                         print(Fore.CYAN + f"[GHOST] {text}")

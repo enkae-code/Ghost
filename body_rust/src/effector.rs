@@ -72,7 +72,7 @@ impl Effector {
     }
 
     /// Types text into the focused window
-    fn execute_type_text(&mut self, payload: &serde_json::Value) -> Result<()> {
+    pub fn execute_type_text(&mut self, payload: &serde_json::Value) -> Result<()> {
         let text = payload
             .get("text")
             .and_then(|v| v.as_str())
@@ -94,7 +94,7 @@ impl Effector {
     }
 
     /// Clicks the mouse at specified coordinates
-    fn execute_click(&mut self, payload: &serde_json::Value) -> Result<()> {
+    pub fn execute_click(&mut self, payload: &serde_json::Value) -> Result<()> {
         let x = payload
             .get("x")
             .and_then(|v| v.as_i64())
@@ -129,14 +129,45 @@ impl Effector {
         Ok(())
     }
 
-    /// Presses a specific key
-    fn execute_press_key(&mut self, payload: &serde_json::Value) -> Result<()> {
+    /// Presses a specific key (supports combo keys like "win+r", "ctrl+k")
+    pub fn execute_press_key(&mut self, payload: &serde_json::Value) -> Result<()> {
         let key_str = payload
             .get("key")
             .and_then(|v| v.as_str())
             .context("Missing 'key' field in payload")?;
 
         println!("[EFFECTOR]    Pressing key: {}", key_str);
+
+        // Handle combo keys like "win+r", "ctrl+k"
+        if key_str.contains('+') {
+            let parts: Vec<&str> = key_str.split('+').collect();
+            let mut keys_to_press: Vec<Key> = Vec::new();
+
+            for part in &parts {
+                let k = match part.trim().to_uppercase().as_str() {
+                    "WIN" | "GUI" | "META" | "WINDOWS" => Key::Meta,
+                    "CTRL" | "CONTROL" => Key::Control,
+                    "ALT" => Key::Alt,
+                    "SHIFT" => Key::Shift,
+                    s if s.len() == 1 => Key::Unicode(s.chars().next().unwrap()),
+                    other => anyhow::bail!("Unknown combo key part: {}", other),
+                };
+                keys_to_press.push(k);
+            }
+
+            // Press all keys down
+            for k in &keys_to_press {
+                self.enigo.key(*k, Direction::Press)
+                    .context("Failed to press combo key")?;
+            }
+            // Release in reverse order
+            for k in keys_to_press.iter().rev() {
+                self.enigo.key(*k, Direction::Release)
+                    .context("Failed to release combo key")?;
+            }
+
+            return Ok(());
+        }
 
         // Map string to Key enum
         let key = match key_str.to_uppercase().as_str() {

@@ -107,9 +107,21 @@ func main() {
 		httpAddr := fmt.Sprintf("127.0.0.1:%d", *httpPort)
 		slog.Info("HTTP Gateway listening", "addr", httpAddr)
 
+		// CORS middleware for frontend dashboard
+		corsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			apiMux.ServeHTTP(w, r)
+		})
+
 		server := &http.Server{
 			Addr:              httpAddr,
-			Handler:           apiMux,
+			Handler:           corsHandler,
 			ReadHeaderTimeout: 5 * time.Second,
 			ReadTimeout:       10 * time.Second,
 			WriteTimeout:      15 * time.Second,

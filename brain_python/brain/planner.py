@@ -10,7 +10,10 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-import ollama
+try:
+    import ollama
+except ImportError:
+    ollama = None
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -80,6 +83,59 @@ class GhostPlanner:
         except Exception as e:
             print(f"[BRAIN] ⚠️ Error extracting content: {e}")
             return ""
+
+    def _call_api_fallback(self, messages: list) -> str:
+        """Fallback to Anthropic or OpenAI API when Ollama is unavailable."""
+        import os
+        import requests
+
+        # Try Anthropic first
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if api_key:
+            print("[BRAIN] Using Anthropic API fallback...")
+            resp = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 2048,
+                    "system": messages[0]["content"],
+                    "messages": [{"role": "user", "content": messages[1]["content"]}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.json()["content"][0]["text"]
+
+        # Try OpenAI
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if api_key:
+            print("[BRAIN] Using OpenAI API fallback...")
+            resp = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": messages,
+                    "response_format": {"type": "json_object"},
+                    "max_tokens": 2048,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+
+        raise RuntimeError(
+            "No LLM available: Ollama offline and no API keys set "
+            "(set ANTHROPIC_API_KEY or OPENAI_API_KEY)"
+        )
 
     def _build_confused_response(self) -> Dict[str, Any]:
         """Fallback SPEAK response so the user always receives feedback."""
@@ -247,54 +303,57 @@ UI Tree Data:
         prompt = self._get_system_prompt(user_input, memory_context)
 
         try:
-            # Security: Use ollama library with localhost-only connection
-            payload = {
-                'model': self.model,
-                'messages': [
-                    {'role': 'system', 'content': prompt},
-                    {'role': 'user', 'content': user_input}
-                ],
-                'format': 'json',
-                'options': {
-                    'num_ctx': 8192,   # Context size
-                    'keep_alive': -1   # <--- CRITICAL: Keep model in VRAM indefinitely
-                }
-            }
-            
-            print(f"[OLLAMA][REQUEST] Model: {self.model}, Messages: {len(payload['messages'])} msgs", flush=True)
-            response = ollama.chat(**payload)
-            print(f"[OLLAMA][RESPONSE] {response}", flush=True)
+            messages = [
+                {'role': 'system', 'content': prompt},
+                {'role': 'user', 'content': user_input}
+            ]
 
-            result = self._extract_message_content(response)
+            # Try Ollama first, fall back to cloud API
+            result = None
+            if ollama is not None:
+                try:
+                    payload = {
+                        'model': self.model,
+                        'messages': messages,
+                        'format': 'json',
+                        'options': {
+                            'num_ctx': 8192,
+                            'keep_alive': -1
+                        }
+                    }
+                    print(f"[OLLAMA][REQUEST] Model: {self.model}, Messages: {len(messages)} msgs", flush=True)
+                    response = ollama.chat(**payload)
+                    print(f"[OLLAMA][RESPONSE] {response}", flush=True)
+                    result = self._extract_message_content(response)
+                except Exception as ollama_err:
+                    print(f"[BRAIN] Ollama unavailable: {ollama_err}. Trying API fallback...")
+
             if not result:
-                print(f"[OLLAMA][ERROR] Empty content in response: {response}", flush=True)
-                return {"error": "Empty response from Ollama"}
+                result = self._call_api_fallback(messages)
+
+            if not result:
+                return {"error": "Empty response from LLM"}
 
             # Parse the JSON response
             parsed = json.loads(result)
             parsed = self._normalize_or_fallback(parsed)
-            
+
             # Security: Validate all actions before returning
             validation_error = self._validate_actions(parsed.get("actions", []))
             if validation_error:
-                print(f"[BRAIN] ⚠️ Action validation failed: {validation_error}. Falling back to SPEAK.")
+                print(f"[BRAIN] Action validation failed: {validation_error}. Falling back to SPEAK.")
                 fallback = self._build_confused_response()
-                # Fallback is static, but validate anyway for paranoia
                 fallback_error = self._validate_actions(fallback.get("actions", []))
                 if fallback_error:
                     return {"error": f"Fallback validation failed: {fallback_error}"}
                 return fallback
 
             # PHASE 4: Action Filtering - Intercept MEMORIZE actions
-            # MEMORIZE is a mental action (Brain's responsibility), not physical (Body's responsibility)
-            # Process memory storage here and filter out MEMORIZE from actions passed to main.py
             filtered_actions = self._filter_and_process_actions(parsed.get("actions", []), user_input)
             parsed["actions"] = filtered_actions
 
             return parsed
 
-        except ollama.ResponseError as e:
-            return {"error": f"Ollama error: {str(e)}"}
         except json.JSONDecodeError as e:
             return {"error": f"Invalid JSON from LLM: {str(e)}"}
         except Exception as e:
@@ -313,38 +372,41 @@ UI Tree Data:
             Dictionary with 'intent', 'plan', and 'actions' keys for recovery, or error dict
         """
         prompt = self._build_recovery_prompt(original_intent, failure_reason, current_vision)
-        
+
         try:
-            payload = {
-                'model': self.model,
-                'messages': [
-                    {'role': 'system', 'content': prompt},
-                    {'role': 'user', 'content': f'Recover from: {failure_reason}'}
-                ],
-                'format': 'json'
-            }
-            
-            print(f"[OLLAMA][RECOVERY] Model: {self.model}, Reason: {failure_reason}", flush=True)
-            response = ollama.chat(**payload)
-            print(f"[OLLAMA][RESPONSE] {response}", flush=True)
-            
-            result = self._extract_message_content(response)
+            messages = [
+                {'role': 'system', 'content': prompt},
+                {'role': 'user', 'content': f'Recover from: {failure_reason}'}
+            ]
+
+            result = None
+            if ollama is not None:
+                try:
+                    payload = {
+                        'model': self.model,
+                        'messages': messages,
+                        'format': 'json'
+                    }
+                    print(f"[OLLAMA][RECOVERY] Model: {self.model}, Reason: {failure_reason}", flush=True)
+                    response = ollama.chat(**payload)
+                    result = self._extract_message_content(response)
+                except Exception as ollama_err:
+                    print(f"[BRAIN] Ollama recovery unavailable: {ollama_err}. Trying API fallback...")
+
             if not result:
-                print(f"[OLLAMA][ERROR] Empty recovery response: {response}", flush=True)
-                return {"error": "Empty response from Ollama"}
-            
-            # Parse the JSON response
+                result = self._call_api_fallback(messages)
+
+            if not result:
+                return {"error": "Empty response from LLM"}
+
             parsed = json.loads(result)
-            
-            # Security: Validate recovery actions
+
             validation_error = self._validate_actions(parsed.get("actions", []))
             if validation_error:
                 return {"error": f"Recovery action validation failed: {validation_error}"}
-            
+
             return parsed
-        
-        except ollama.ResponseError as e:
-            return {"error": f"Ollama error: {str(e)}"}
+
         except json.JSONDecodeError as e:
             return {"error": f"Invalid JSON from LLM: {str(e)}"}
         except Exception as e:

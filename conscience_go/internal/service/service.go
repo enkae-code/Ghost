@@ -3,6 +3,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 
@@ -108,13 +109,26 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 	// 4. Log Intent
 	// Note: We perform this async or ignore error to not block latency
 	go func() {
-		// Adapt this call to your specific IntentRepo method signature
 		_ = s.IntentRepo.RecordSuccess(context.Background(), req.Intent, currentWindow, "")
 	}()
 
+	// 5. Enqueue approved actions to Body stream
+	for i, action := range req.Actions {
+		cmd := &pb.ActionCommand{
+			CommandId: fmt.Sprintf("%s-%d", req.TraceId, i),
+			Action:    action,
+		}
+		select {
+		case s.actionChan <- cmd:
+			slog.Info("Action enqueued for Body", "id", cmd.CommandId, "type", action.Type)
+		default:
+			slog.Warn("Action channel full, dropping", "id", cmd.CommandId)
+		}
+	}
+
 	return &pb.PermissionResponse{
 		Approved:   true,
-		TrustScore: 85, // Mock score for now
+		TrustScore: 85,
 	}, nil
 }
 
