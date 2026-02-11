@@ -162,7 +162,7 @@ func TestValidateAction(t *testing.T) {
 	}
 }
 
-func TestValidateActions(t *testing.T) {
+func TestValidateActionsWrapper(t *testing.T) {
 	config := DefaultSafetyConfig()
 	s := NewSafetyChecker(config)
 

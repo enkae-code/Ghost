@@ -1,12 +1,12 @@
+# // Author: Enkae (enkae.dev@pm.me)
 class WhisperEngine:
-    """Stub WhisperEngine for when voice is unavailable."""
+    """Stub WhisperEngine for when model loading fails or is disabled."""
 
-    def __init__(self, model_size="tiny.en", device="cpu"):
-        self.model_size = model_size
-        self.device = device
+    def __init__(self, model_size="tiny", device="cpu"):
+        pass
 
     def load(self):
-        raise RuntimeError("Voice disabled — type commands instead")
+        pass
 
     def transcribe(self, audio_path):
         return ""

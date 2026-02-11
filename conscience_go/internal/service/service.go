@@ -7,7 +7,10 @@ import (
 	"log/slog"
 	"sync"
 
+	"encoding/json"
+
 	"ghost/kernel/internal/adapter"
+	"ghost/kernel/internal/conscience"
 	"ghost/kernel/internal/domain"
 	pb "ghost/kernel/internal/protocol"
 
@@ -30,6 +33,8 @@ type GhostService struct {
 	StateRepo *adapter.StateRepository
 	// Safety is the safety checker for intents and actions.
 	Safety *SafetyChecker
+	// Validator is the core conscience kernel validator.
+	Validator *conscience.Validator
 
 	// focusMu protects focusState.
 	focusMu sync.RWMutex
@@ -53,6 +58,7 @@ func NewGhostService(
 		MemoryRepo: memoryRepo,
 		StateRepo:  stateRepo,
 		Safety:     NewSafetyChecker(DefaultSafetyConfig()), // Use strict defaults by default
+		Validator:  conscience.NewValidator(),
 		focusState: &pb.FocusState{WindowTitle: "Unknown"},
 		actionChan: make(chan *pb.ActionCommand, 100), // Buffer for safety
 	}
@@ -97,12 +103,41 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 		}, nil
 	}
 
-	// 3. Action Validation
-	if ok, reason := s.Safety.ValidateActions(req.Actions); !ok {
-		slog.Warn("Action Validation Failed", "reason", reason, "trace_id", req.TraceId)
+	// 3. Action Validation (Via Conscience Kernel)
+	legacyActions := make([]pb.LegacyAction, len(req.Actions))
+	for i, action := range req.Actions {
+		// Marshal payload map to JSON
+		payloadBytes, _ := json.Marshal(action.Payload)
+		legacyActions[i] = pb.LegacyAction{
+			Type:      action.Type,
+			Payload:   payloadBytes,
+			RiskLevel: pb.RiskLevelNone, // Validator will calculate
+		}
+	}
+
+	validationReq := &pb.ActionValidationRequest{
+		RequestID:      req.TraceId,
+		Intent:         req.Intent,
+		Actions:        legacyActions,
+		ExpectedWindow: "",    // TODO: Extract from intent if possible
+		Override:       false, // Brain cannot override on its own
+		TraceID:        req.TraceId,
+	}
+
+	// Update validator focus context
+	s.Validator.SetFocusedWindow(currentWindow)
+
+	validationResult := s.Validator.ValidateAction(ctx, validationReq)
+	if !validationResult.Valid || validationResult.Blocked {
+		slog.Warn("Conscience Blocked Action",
+			"reason", validationResult.Reason,
+			"risk_level", validationResult.RiskLevel,
+			"trace_id", req.TraceId,
+		)
 		return &pb.PermissionResponse{
-			Approved: false,
-			Reason:   "Safety Violation: " + reason,
+			Approved:   false,
+			Reason:     "Conscience Violation: " + validationResult.Reason,
+			TrustScore: int32(validationResult.TrustScore),
 		}, nil
 	}
 

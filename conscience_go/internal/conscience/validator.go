@@ -53,6 +53,14 @@ var DangerousActionTypes = map[string]protocol.RiskLevel{
 	"FILE_WRITE":  protocol.RiskLevelHigh,
 	"FILE_DELETE": protocol.RiskLevelCritical,
 	"EXECUTE":     protocol.RiskLevelCritical,
+	"SPEAK":       protocol.RiskLevelNone,
+	"MEMORIZE":    protocol.RiskLevelLow,
+	"SCAN":        protocol.RiskLevelNone,
+	"LIST":        protocol.RiskLevelLow,
+	"READ":        protocol.RiskLevelLow,
+	"SEARCH":      protocol.RiskLevelLow,
+	"WRITE":       protocol.RiskLevelHigh,
+	"EDIT":        protocol.RiskLevelHigh,
 }
 
 // Validator is the Conscience Kernel that validates all actions
@@ -129,6 +137,22 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 				Override:   req.Override,
 				TrustScore: v.getTrustScore(req.Intent),
 				Reason:     fmt.Sprintf("Action %d contains blocked keyword pattern", i),
+				RiskLevel:  protocol.RiskLevelCritical,
+			}
+			v.logAudit(req, result)
+			return result
+		}
+
+		// Perform path validation for filesystem actions
+		if !v.validateActionPath(action) {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			result := &protocol.ActionValidationResult{
+				Valid:      false,
+				Blocked:    true,
+				Override:   req.Override,
+				TrustScore: v.getTrustScore(req.Intent),
+				Reason:     fmt.Sprintf("Action %d contains unsafe path", i),
 				RiskLevel:  protocol.RiskLevelCritical,
 			}
 			v.logAudit(req, result)
@@ -359,4 +383,63 @@ func (v *Validator) RequestApproval(ctx context.Context, req *protocol.ExecAppro
 // ResolveApproval handles exec.resolve from the gateway
 func (v *Validator) ResolveApproval(ctx context.Context, req *protocol.ExecApprovalResolveParams) error {
 	return v.ResolveRequest(req.RequestID, req.Approved, req.Reason)
+}
+
+// validateActionPath checks if filesystem actions contain safe paths
+func (v *Validator) validateActionPath(action *protocol.LegacyAction) bool {
+	if action == nil {
+		return true
+	}
+
+	actionType := strings.ToUpper(action.Type)
+	switch actionType {
+	case "WRITE", "EDIT", "READ", "LIST", "SEARCH", "FILE_WRITE", "FILE_DELETE":
+		// Parse payload to find path
+		var payload map[string]interface{}
+		if len(action.Payload) > 0 {
+			if err := json.Unmarshal(action.Payload, &payload); err != nil {
+				// If we can't parse payload but it's a file action, be safe and reject?
+				// Or assume it's not a valid file action.
+				// For safety, if we can't parse, we can't validate, so reject.
+				return false
+			}
+		}
+
+		// Check "path" key
+		if val, ok := payload["path"]; ok {
+			if pathStr, ok := val.(string); ok {
+				if !v.isSafePath(pathStr) {
+					return false
+				}
+			}
+		}
+		// Check "directory" key (for LIST/SEARCH)
+		if val, ok := payload["directory"]; ok {
+			if dirStr, ok := val.(string); ok {
+				if !v.isSafePath(dirStr) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// isSafePath returns true if the path is relative and does not contain directory traversal.
+func (v *Validator) isSafePath(path string) bool {
+	if path == "" {
+		return true
+	}
+
+	// No absolute paths (simple check for Unix and Windows)
+	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") || (len(path) > 1 && path[1] == ':') {
+		return false
+	}
+
+	// No traversal
+	if strings.Contains(path, "..") {
+		return false
+	}
+
+	return true
 }
