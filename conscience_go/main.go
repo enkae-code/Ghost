@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -104,6 +105,34 @@ func main() {
 			log.Fatalf("Failed to register gateway: %v", err)
 		}
 
+		// Create a root mux to route API and Static files
+		rootMux := http.NewServeMux()
+
+		// 1. Handle API requests via gRPC Gateway
+		// Note: The gRPC gateway mux matches patterns defined in proto (e.g. /v1/...)
+		rootMux.Handle("/v1/", apiMux)
+
+		// 2. Serve React Frontend (Static Files) with SPA fallback
+		staticDir := "./dashboard/landing/dist"
+		fs := http.FileServer(http.Dir(staticDir))
+
+		rootMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Clean path to prevent directory traversal
+			path := filepath.Clean(r.URL.Path)
+			fullPath := filepath.Join(staticDir, path)
+
+			// Check if file exists
+			_, err := os.Stat(fullPath)
+			if os.IsNotExist(err) {
+				// If file doesn't exist, serve index.html for client-side routing
+				http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+				return
+			}
+
+			// Otherwise serve the file (or let FileServer handle permission/dir logic)
+			fs.ServeHTTP(w, r)
+		}))
+
 		httpAddr := fmt.Sprintf("127.0.0.1:%d", *httpPort)
 		slog.Info("HTTP Gateway listening", "addr", httpAddr)
 
@@ -116,7 +145,7 @@ func main() {
 				w.WriteHeader(http.StatusOK)
 				return
 			}
-			apiMux.ServeHTTP(w, r)
+			rootMux.ServeHTTP(w, r)
 		})
 
 		server := &http.Server{
