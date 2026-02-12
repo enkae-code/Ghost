@@ -1,3 +1,4 @@
+# // Author: Enkae (enkae.dev@pm.me)
 class AudioRecorder:
     """Stub AudioRecorder for when voice hardware is unavailable."""
 
