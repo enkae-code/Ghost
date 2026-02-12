@@ -17,9 +17,20 @@
   --animate-scan-line: scan 2s linear infinite;
 
   @keyframes scan {
-    0% { transform: translateY(-100%); }
-    100% { transform: translateY(100%); }
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100%);
+    }
   }
+}
+
+@utility glass-panel {
+  background-color: color-mix(in srgb, white 5%, transparent);
+  backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
 }
 
 /* Utilities */
