@@ -3,12 +3,16 @@ import { SovereignHero } from "./sections/SovereignHero";
 import { InstallationTerminal } from "./sections/InstallationTerminal";
 import { CodeHologram } from "./components/premium/CodeHologram";
 
+import { Navbar } from "./components/layout/Navbar";
+
 function App() {
   return (
-    <main className="min-h-screen bg-void text-ghost selection:bg-cyan/30 selection:text-cyan overflow-hidden">
+    <main className="min-h-screen bg-void text-ghost selection:bg-cyan/30 selection:text-cyan overflow-hidden font-sans">
        {/* Global Scanline Overlay */}
        <div className="fixed inset-0 pointer-events-none z-50 opacity-[0.02] bg-[url('https://grainy-gradients.vercel.app/noise.svg')] brightness-100 contrast-150 mix-blend-overlay"></div>
        
+       <Navbar />
+
        {/* Main Content Sections */}
        <main>
            <SovereignHero />
