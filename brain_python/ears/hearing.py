@@ -1,3 +1,4 @@
+# // Author: Enkae (enkae.dev@pm.me)
 class WhisperEngine:
     """Stub WhisperEngine for when voice is unavailable."""
 

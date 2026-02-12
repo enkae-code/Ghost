@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,22 @@ var DangerousActionTypes = map[string]protocol.RiskLevel{
 	"FILE_WRITE":  protocol.RiskLevelHigh,
 	"FILE_DELETE": protocol.RiskLevelCritical,
 	"EXECUTE":     protocol.RiskLevelCritical,
+	// Add mapping for Brain action types
+	"WRITE":       protocol.RiskLevelHigh,   // Maps to FILE_WRITE
+	"EDIT":        protocol.RiskLevelHigh,   // Maps to file edit
+	"READ":        protocol.RiskLevelMedium, // Maps to file read
+	"LIST":        protocol.RiskLevelLow,    // Maps to file list
+	"SEARCH":      protocol.RiskLevelLow,    // Maps to file search
+	"SCAN":        protocol.RiskLevelNone,   // Visual scan
+	"SPEAK":       protocol.RiskLevelNone,   // Audio output
+	"MEMORIZE":    protocol.RiskLevelNone,   // Memory operation
+}
+
+// AllowedActionTypes is the strict allowlist of actions
+var AllowedActionTypes = map[string]bool{
+	"KEY": true, "TYPE": true, "CLICK": true, "WAIT": true, "SPEAK": true,
+	"MEMORIZE": true, "SCAN": true, "LIST": true, "READ": true,
+	"SEARCH": true, "WRITE": true, "EDIT": true,
 }
 
 // Validator is the Conscience Kernel that validates all actions
@@ -114,6 +131,36 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 	maxRisk := protocol.RiskLevelNone
 	for i := range req.Actions {
 		action := &req.Actions[i]
+
+		// Enforce Allowlist
+		actionType := strings.ToUpper(action.Type)
+		if !AllowedActionTypes[actionType] {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			result := &protocol.ActionValidationResult{
+				Valid:      false,
+				Blocked:    true,
+				Reason:     fmt.Sprintf("Action type '%s' is not allowed", action.Type),
+				RiskLevel:  protocol.RiskLevelCritical,
+			}
+			v.logAudit(req, result)
+			return result
+		}
+
+		// Validate File System Paths
+		if err := v.validateActionPath(action); err != nil {
+			v.mu.Lock()
+			defer v.mu.Unlock()
+			result := &protocol.ActionValidationResult{
+				Valid:      false,
+				Blocked:    true,
+				Reason:     fmt.Sprintf("Path validation failed for action %d: %v", i, err),
+				RiskLevel:  protocol.RiskLevelCritical,
+			}
+			v.logAudit(req, result)
+			return result
+		}
+
 		actionRisk := v.evaluateActionRisk(action)
 		if actionRisk > maxRisk {
 			maxRisk = actionRisk
@@ -190,6 +237,87 @@ func (v *Validator) ValidateAction(ctx context.Context, req *protocol.ActionVali
 
 	v.logAudit(req, result)
 	return result
+}
+
+// validateActionPath checks for safe file system paths
+func (v *Validator) validateActionPath(action *protocol.LegacyAction) error {
+	actionType := strings.ToUpper(action.Type)
+
+	// Parse payload map (LegacyAction payload is json.RawMessage, need to unmarshal)
+	var payload map[string]interface{}
+	if len(action.Payload) > 0 {
+		if err := json.Unmarshal(action.Payload, &payload); err != nil {
+			return fmt.Errorf("invalid payload json")
+		}
+	} else {
+		// Actions that require paths must have a payload
+		if actionType == "WRITE" || actionType == "EDIT" || actionType == "READ" || actionType == "LIST" || actionType == "SEARCH" {
+			return fmt.Errorf("missing payload for action type '%s'", actionType)
+		}
+		return nil
+	}
+
+	// Helper to check path
+	checkPath := func(key string) error {
+		val, ok := payload[key]
+		if !ok {
+			return fmt.Errorf("missing required key '%s'", key)
+		}
+		pathStr, ok := val.(string)
+		if !ok {
+			return fmt.Errorf("key '%s' must be a string", key)
+		}
+		if !v.validateFileSystemPath(pathStr) {
+			return fmt.Errorf("invalid path '%s' (must be relative and safe)", pathStr)
+		}
+		return nil
+	}
+
+	switch actionType {
+	case "WRITE", "EDIT", "READ":
+		return checkPath("path")
+	case "LIST":
+		// Prioritize directory, fallback to path
+		if _, ok := payload["directory"]; ok {
+			return checkPath("directory")
+		}
+		return checkPath("path")
+	case "SEARCH":
+		return checkPath("directory")
+	}
+
+	return nil
+}
+
+// validateFileSystemPath ensures path is relative and safe
+func (v *Validator) validateFileSystemPath(path string) bool {
+	// 1. Prohibit prefixes like /, \, or Windows drive letters
+	if strings.HasPrefix(path, "/") || strings.HasPrefix(path, "\\") || (len(path) > 1 && path[1] == ':') {
+		return false
+	}
+
+	// 2. Check for directory traversal (..)
+	// filepath.Clean resolves .. but we want to detect if it tries to escape
+	// A simple check is to look for ".." in the path components
+	// But explicitly, we want to ensure it's relative.
+	if filepath.IsAbs(path) {
+		return false
+	}
+
+	// Clean the path to remove redundant separators and resolve . and ..
+	cleanPath := filepath.Clean(path)
+
+	// If clean path starts with .. or is absolute, it's unsafe
+	if strings.HasPrefix(cleanPath, "..") || filepath.IsAbs(cleanPath) {
+		return false
+	}
+
+	// Additional check for Windows drive letters in cleaned path (just in case)
+	if len(cleanPath) > 1 && cleanPath[1] == ':' {
+		return false
+	}
+
+	return true
 }
 
 // evaluateActionRisk determines the risk level of a single action
