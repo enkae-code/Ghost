@@ -1,3 +1,4 @@
+# // Author: Enkae (enkae.dev@pm.me)
 import os
 
 filepath = "conscience_go/internal/service/safety_actions_test.go"
