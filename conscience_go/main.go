@@ -112,8 +112,8 @@ func main() {
 		// Note: The gRPC gateway mux matches patterns defined in proto (e.g. /v1/...)
 		rootMux.Handle("/v1/", apiMux)
 
-		// 2. Serve React Frontend (Static Files) with SPA fallback
-		staticDir := "./dashboard/landing/dist"
+		// 2. Serve static frontend (build output from apps/landing or apps/dashboard)
+		staticDir := "./static"
 		fs := http.FileServer(http.Dir(staticDir))
 
 		rootMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

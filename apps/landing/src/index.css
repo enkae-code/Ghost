@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-void: #050a14;
+  --color-plate: #0a1220;
+  --color-ghost: #e2e8f0;
+  --color-cyan: #00f0ff;
+  --color-grid: #1e293b;
+
+  /* Typography */
+  --font-sans: "Outfit", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Animations */
+  --animate-pulse-slow: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-scan-line: scan 2s linear infinite;
+
+  @keyframes scan {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100%);
+    }
+  }
+}
+
+@utility glass-panel {
+  background-color: color-mix(in srgb, white 5%, transparent);
+  backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+}
+
+/* Utilities */
+@utility text-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+@utility bg-void {
+  background-color: var(--color-void);
+}
+
+@utility text-ghost {
+  color: var(--color-ghost);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  background: var(--color-void);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-grid);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-cyan);
+}

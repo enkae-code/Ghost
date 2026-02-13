@@ -1,0 +1,86 @@
+# Ghost — Cursor Rules (Internal)
+
+Read this file at the start of every session when working in this repo. Documentation (README, ARCHITECTURE) may lag; this file reflects the current codebase.
+
+---
+
+## What Ghost Is
+
+**Ghost** is a **voice-controlled, local-first AI system** for the Mozilla Fellowship (deadline Feb 13, 2026). Tagline: *"A sovereign, local-first AI that lives in the machine."*
+
+- **Offline-only:** No external API for core functions.
+- **Zero telemetry:** Data never leaves the device.
+- **Consumer hardware:** Llama 3.1 8B, Whisper Tiny, etc.
+
+**Tri-Brain architecture:**
+
+| Layer      | Dir            | Role                          | Tech                    |
+|-----------|----------------|-------------------------------|-------------------------|
+| **Brain** | `brain_python/`| Orchestrator & planner        | Ollama, Whisper, Piper  |
+| **Conscience** | `conscience_go/` | Safety kernel & memory   | Go, gRPC, SQLite        |
+| **Body**  | `body_rust/`   | Sentinel & effector          | Rust, Windows UI Automation |
+
+Communication is defined in **`ghost.proto`** (Nervous System): gRPC for Brain/Body ↔ Kernel, REST via gRPC-Gateway for the dashboard at `http://localhost:8080/v1/`.
+
+---
+
+## Context First (Prime Directive)
+
+- **Always** read `.context/PROJECT.md` first when starting work.
+- Then `.context/ARCHITECTURE.md` and `.context/LEARNINGS.md` when relevant.
+- If `.context/` is missing, assume Scout Mode and do not implement; suggest `/init-hp` or initializing context.
+
+---
+
+## Repo Layout (Actual)
+
+**Layout (canonical):**
+- **`apps/landing/`** — Landing/marketing page (hero, protocol, features, install). Source of truth; kernel does not own UI source.
+- **`apps/dashboard/`** — Ghost product UI (Neural Terminal). Add when building the app; build output goes to `conscience_go/static/`.
+- **`conscience_go/`** — Kernel only (Go). No frontend source. Serves `/v1/` API and static from `./static` (build output). Build landing with `./scripts/build-static.ps1`.
+- **`body_rust/`** — Rust sentinel (ghost_sentinel). Build with `cargo build` in that dir.
+- **`brain_python/`** — Python AI subsystem; Makefile generates Python stubs from `ghost.proto`.
+- **`ghost.proto`** — Single source of truth for Nervous System RPCs. After editing, run `make gen` (from repo root) to regenerate Go and Python.
+- **`bin/audit.ps1`** — Local audit script (secrets, identity, branding, policy). Use when `jules audit` is not available: `.\bin\audit.ps1` or `.\bin\audit.ps1 -Diff`.
+- **`.context/FRONTEND_LAYOUT.md`** — Full frontend layout and migration notes.
+
+---
+
+## Frontend (apps/landing + apps/dashboard)
+
+- **Stack:** React 19, Vite 7, Tailwind 4, Framer Motion, GSAP, TypeScript. Same design system for both apps. Landing source: `apps/landing`.
+- **Design tokens** (use these; no ad-hoc colors):
+  - `--color-void` (#050a14), `--color-plate` (#0a1220), `--color-ghost` (#e2e8f0), `--color-cyan` (#00f0ff), `--color-grid` (#1e293b).
+  - Utilities: `bg-void`, `text-ghost`, `text-label`, `glass-panel`.
+- **Fonts:** `--font-sans` (Outfit, Inter), `--font-mono` (JetBrains Mono).
+- **Aesthetic:** Void / Hollow Prism — dark, minimal, cyan accents, scanline/grain overlays, premium motion. No generic AI slop.
+- **Strict typing:** No `any`. Components &lt; 150 lines, functions &lt; 40 where practical.
+
+---
+
+## Conventions
+
+- **Git author:** `enkae.dev@pm.me`. Audit script enforces this.
+- **Branch protection:** No direct commits to `main`. All changes via Pull Request (human or agent). No force push on `main`.
+- **Proto/API:** Author block in `ghost.proto` is Enkae. Go package: `ghost/kernel`; protobuf package: `ghost`.
+
+---
+
+## After Edits (Chief of Staff)
+
+After file writes or state-changing commands, run audit and report in one line:
+
+- `jules audit --diff` or `jules audit` when available.
+- Else: `.\bin\audit.ps1 -Diff` or `.\bin\audit.ps1` (PowerShell from repo root).
+
+Report: **"✅ Jules Audit Passed."** or **"⚠️ Jules Audit Warning: [details]."** If neither Jules nor the script is runnable, state: **"Jules not available; skip audit."**
+
+---
+
+## Session Log
+
+If the user says **/log** or **"log this session"**, run the chief-of-staff session log script if present, or summarize and offer to append to `.context/LEARNINGS.md`.
+
+---
+
+*Generated from repo inspection. Keep .cursorrules updated when structure or conventions change.*
