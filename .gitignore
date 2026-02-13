@@ -36,6 +36,9 @@ wheels/
 # Go (Conscience)
 conscience_go/conscience_go.exe
 conscience_go/conscience_go
+# Build output only; do not commit built assets
+conscience_go/static/*
+!conscience_go/static/.gitkeep
 *.test
 *.prof
 

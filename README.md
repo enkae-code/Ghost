@@ -45,14 +45,15 @@ Ghost is a **voice-controlled, local-first AI architecture** designed to give us
    cd ghost
    ```
 
-2. **Build the Dashboard**
+2. **Build the landing page** (optional; for kernel to serve UI at `/`)
 
-   ```bash
-   cd conscience_go/dashboard/landing
-   npm install
-   npm run build
-   cd ../../..
+   ```powershell
+   cd apps/landing && npm install && npm run build
+   cd ../..
+   .\scripts\build-static.ps1
    ```
+
+   Or run the kernel API-only and deploy the landing separately (see `.context/FRONTEND_LAYOUT.md`).
 
 3. **Start the Kernel**
 
