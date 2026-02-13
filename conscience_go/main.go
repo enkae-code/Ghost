@@ -138,7 +138,19 @@ func main() {
 
 		// CORS middleware for frontend dashboard
 		corsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			allowedOrigins := []string{
+				fmt.Sprintf("http://localhost:%d", *httpPort),
+				fmt.Sprintf("http://127.0.0.1:%d", *httpPort),
+			}
+
+			origin := r.Header.Get("Origin")
+			for _, allowed := range allowedOrigins {
+				if origin == allowed {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					break
+				}
+			}
+
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 			if r.Method == "OPTIONS" {
