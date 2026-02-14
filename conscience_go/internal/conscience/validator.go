@@ -283,7 +283,11 @@ func (v *Validator) validateActionPath(action *protocol.LegacyAction) error {
 		}
 		return checkPath("path")
 	case "SEARCH":
-		return checkPath("directory")
+		// Prioritize directory, fallback to path
+		if _, ok := payload["directory"]; ok {
+			return checkPath("directory")
+		}
+		return checkPath("path")
 	}
 
 	return nil

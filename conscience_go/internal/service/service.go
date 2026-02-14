@@ -3,11 +3,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
 
 	"ghost/kernel/internal/adapter"
+	"ghost/kernel/internal/conscience"
 	"ghost/kernel/internal/domain"
 	pb "ghost/kernel/internal/protocol"
 
@@ -28,8 +30,8 @@ type GhostService struct {
 	MemoryRepo *adapter.SQLiteRepository
 	// StateRepo is the repository for system state.
 	StateRepo *adapter.StateRepository
-	// Safety is the safety checker for intents and actions.
-	Safety *SafetyChecker
+	// Validator is the conscience kernel validator.
+	Validator *conscience.Validator
 
 	// focusMu protects focusState.
 	focusMu sync.RWMutex
@@ -46,13 +48,14 @@ func NewGhostService(
 	intentRepo *adapter.IntentHistoryRepository,
 	memoryRepo *adapter.SQLiteRepository,
 	stateRepo *adapter.StateRepository,
+	validator *conscience.Validator,
 ) *GhostService {
 	return &GhostService{
 		ActionRepo: actionRepo,
 		IntentRepo: intentRepo,
 		MemoryRepo: memoryRepo,
 		StateRepo:  stateRepo,
-		Safety:     NewSafetyChecker(DefaultSafetyConfig()), // Use strict defaults by default
+		Validator:  validator,
 		focusState: &pb.FocusState{WindowTitle: "Unknown"},
 		actionChan: make(chan *pb.ActionCommand, 100), // Buffer for safety
 	}
@@ -72,6 +75,11 @@ func (s *GhostService) ReportFocus(stream pb.NervousSystem_ReportFocusServer) er
 		s.focusState = focus
 		s.focusMu.Unlock()
 
+		// Update validator focus state
+		if s.Validator != nil {
+			s.Validator.SetFocusedWindow(focus.WindowTitle)
+		}
+
 		slog.Debug("Focus updated", "window", focus.WindowTitle, "process", focus.ProcessName)
 	}
 }
@@ -87,32 +95,56 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 	currentWindow := s.focusState.WindowTitle
 	s.focusMu.RUnlock()
 
-	// 2. Safety Check (Policy Engine)
-	isDangerous, kw := s.Safety.IsDangerous(req.Intent)
-	if isDangerous {
-		slog.Warn("Safety Violation", "intent", req.Intent, "keyword", kw)
+	// 2. Action Validation (using Conscience Kernel)
+	// Convert gRPC actions (map payload) to LegacyActions (json payload)
+	var legacyActions []pb.LegacyAction
+	for _, a := range req.Actions {
+		// Convert payload map to JSON
+		payloadBytes, err := json.Marshal(a.Payload)
+		if err != nil {
+			slog.Error("Failed to marshal action payload", "error", err)
+			return nil, status.Error(codes.InvalidArgument, "Failed to marshal action payload")
+		}
+		legacyActions = append(legacyActions, pb.LegacyAction{
+			Type:      a.Type,
+			Payload:   payloadBytes,
+			RiskLevel: pb.RiskLevelNone, // Default, validator will assess
+		})
+	}
+
+	// Create ActionValidationRequest
+	valReq := &pb.ActionValidationRequest{
+		RequestID:      req.TraceId, // Use TraceId as RequestID
+		Intent:         req.Intent,
+		Actions:        legacyActions,
+		ExpectedWindow: "", // Brain (via gRPC) currently doesn't send expected window
+		Override:       false,
+		TraceID:        req.TraceId,
+	}
+
+	// Call Validator
+	if s.Validator == nil {
+		return nil, status.Error(codes.Internal, "Validator not initialized")
+	}
+	result := s.Validator.ValidateAction(ctx, valReq)
+
+	if !result.Valid || result.Blocked {
+		slog.Warn("Action blocked by Conscience", "reason", result.Reason, "risk", result.RiskLevel)
 		return &pb.PermissionResponse{
-			Approved: false,
-			Reason:   "Violates Safety Policy: Blocked Keyword '" + kw + "'",
+			Approved:   false,
+			Reason:     result.Reason,
+			TrustScore: int32(result.TrustScore),
 		}, nil
 	}
 
-	// 3. Action Validation
-	if ok, reason := s.Safety.ValidateActions(req.Actions); !ok {
-		slog.Warn("Action Validation Failed", "reason", reason, "trace_id", req.TraceId)
-		return &pb.PermissionResponse{
-			Approved: false,
-			Reason:   "Safety Violation: " + reason,
-		}, nil
-	}
-
-	// 4. Log Intent
-	// Note: We perform this async or ignore error to not block latency
+	// 3. Log Intent (Async)
 	go func() {
 		_ = s.IntentRepo.RecordSuccess(context.Background(), req.Intent, currentWindow, "")
+		// Also update trust score in Validator
+		s.Validator.RecordSuccess(req.Intent)
 	}()
 
-	// 5. Enqueue approved actions to Body stream
+	// 4. Enqueue approved actions to Body stream
 	for i, action := range req.Actions {
 		cmd := &pb.ActionCommand{
 			CommandId: fmt.Sprintf("%s-%d", req.TraceId, i),
@@ -128,7 +160,7 @@ func (s *GhostService) RequestPermission(ctx context.Context, req *pb.Permission
 
 	return &pb.PermissionResponse{
 		Approved:   true,
-		TrustScore: 85,
+		TrustScore: int32(result.TrustScore),
 	}, nil
 }
 

@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"ghost/kernel/internal/adapter"
+	"ghost/kernel/internal/conscience"
 	pb "ghost/kernel/internal/protocol"
 	"ghost/kernel/internal/service"
 
@@ -68,7 +69,8 @@ func main() {
 	}
 
 	// 5. Initialize Logic (The "Brain")
-	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
+	validator := conscience.NewValidator()
+	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo, validator)
 
 	// 6. Start gRPC Server
 	grpcAddr := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
@@ -147,6 +149,7 @@ func main() {
 			for _, allowed := range allowedOrigins {
 				if origin == allowed {
 					w.Header().Set("Access-Control-Allow-Origin", origin)
+					w.Header().Set("Vary", "Origin")
 					break
 				}
 			}
