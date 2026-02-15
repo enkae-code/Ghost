@@ -1,5 +1,5 @@
 // Author: Enkae (enkae.dev@pm.me)
-// Package gateway provides the WebSocket JSON-RPC 2.0 server for Ghost.
+// Package gateway provides the TCP JSON-RPC 2.0 server for Ghost.
 // This is the unified control plane for VA Tactical, handling:
 // - Voice wake activation
 // - Execution approvals (Conscience Kernel)
@@ -123,7 +123,7 @@ func (s *Server) Start(ctx context.Context) error {
 	defer listener.Close()
 
 	slog.Info("Ghost Gateway listening", "address", listenAddr, "protocol", protocol.ProtocolVersion)
-	fmt.Printf("[GATEWAY] 🌐 WebSocket Gateway listening on %s (Protocol v%s)\n", listenAddr, protocol.ProtocolVersion)
+	fmt.Printf("[GATEWAY] 🌐 TCP Gateway listening on %s (Protocol v%s)\n", listenAddr, protocol.ProtocolVersion)
 
 	// Start event broadcaster
 	go s.broadcastLoop(ctx)

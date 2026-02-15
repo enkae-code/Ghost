@@ -113,7 +113,7 @@ func main() {
 		rootMux.Handle("/v1/", apiMux)
 
 		// 2. Serve static frontend (build output from apps/landing or apps/dashboard)
-		staticDir := "./static"
+		staticDir := "./dashboard/landing/dist"
 		fs := http.FileServer(http.Dir(staticDir))
 
 		rootMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +153,7 @@ func main() {
 
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Vary", "Origin")
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusOK)
 				return
