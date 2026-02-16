@@ -385,6 +385,22 @@ class Ghost:
             self.logger.info(f"Invalidated reflex cache for: {intent}")
         else:
             self.logger.debug(f"Could not invalidate reflex (kernel unavailable): {intent}")
+
+    def _is_safe_path(self, path: str) -> bool:
+        """Check if path is safe for writing (no traversal, no sensitive dirs)."""
+        if not path:
+            return False
+        # Prevent traversal
+        if ".." in path:
+            return False
+        # Prevent writing to root on Linux/Mac
+        if path == "/" or path.startswith("/etc") or path.startswith("/var"):
+            return False
+        # Prevent writing to Windows system dirs (basic check)
+        lower_path = path.lower()
+        if "windows\\system32" in lower_path or "windows/system32" in lower_path:
+            return False
+        return True
     
     def start(self):
         """Main input loop for Ghost."""
@@ -515,6 +531,10 @@ class Ghost:
                     elif action_type == "WRITE":
                         path = action.get("path")
                         # Ensure path is valid/safe before writing
+                        if not self._is_safe_path(path):
+                             print(Fore.RED + f"       [{i}] Blocked unsafe write path: {path}")
+                             continue
+
                         try:
                             with open(path, 'w') as f: f.write(action.get("content", ""))
                             print(f"       [{i}] Wrote: {path}")
