@@ -113,14 +113,14 @@ func (b *LegacyBridge) Store(ctx context.Context, req *protocol.MemoryStoreParam
 		return nil, err
 	}
 
-	// Update with embedding if provided (since Save doesn't handle it)
+	// Always persist Key and Context (classification, summary); embedding if provided (Save doesn't handle these)
+	var embeddingJSON string
 	if len(req.Vector) > 0 {
-		vectorJSON, _ := json.Marshal(req.Vector)
-		// UpdateArtifact takes (id, classification, summary, embedding)
-		if err := b.memoryRepo.UpdateArtifact(ctx, artifact.ID, req.Key, req.Context, string(vectorJSON)); err != nil {
-			// Log error but success for the store itself
-			fmt.Printf("[LEGACY] Failed to update embedding for memory %s: %v\n", artifact.ID, err)
-		}
+		b, _ := json.Marshal(req.Vector)
+		embeddingJSON = string(b)
+	}
+	if err := b.memoryRepo.UpdateArtifact(ctx, artifact.ID, req.Key, req.Context, embeddingJSON); err != nil {
+		fmt.Printf("[LEGACY] Failed to update metadata for memory %s: %v\n", artifact.ID, err)
 	}
 
 	return &protocol.MemoryStoreResult{Success: true, ArtifactID: artifact.ID}, nil

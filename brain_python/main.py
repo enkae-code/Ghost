@@ -387,20 +387,26 @@ class Ghost:
             self.logger.debug(f"Could not invalidate reflex (kernel unavailable): {intent}")
 
     def _is_safe_path(self, path: str) -> bool:
-        """Check if path is safe for writing (no traversal, no sensitive dirs)."""
+        """
+        Validates that a path is relative and stays within safe boundaries.
+        Prevents path traversal attacks (e.g., ../../windows/system32).
+        """
         if not path:
             return False
-        # Prevent traversal
-        if ".." in path:
+        try:
+            path_obj = Path(path)
+            # Prevent absolute paths (e.g. C:\ or /etc)
+            if path_obj.is_absolute():
+                return False
+
+            # Resolve path relative to current working directory
+            base_dir = Path.cwd().resolve()
+            target_path = (base_dir / path_obj).resolve()
+
+            # Check if target path is within base_dir
+            return target_path.is_relative_to(base_dir)
+        except Exception:
             return False
-        # Prevent writing to root on Linux/Mac
-        if path == "/" or path.startswith("/etc") or path.startswith("/var"):
-            return False
-        # Prevent writing to Windows system dirs (basic check)
-        lower_path = path.lower()
-        if "windows\\system32" in lower_path or "windows/system32" in lower_path:
-            return False
-        return True
     
     def start(self):
         """Main input loop for Ghost."""
