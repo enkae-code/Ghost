@@ -12,7 +12,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"ghost/kernel/internal/adapter"
+	"ghost/kernel/internal/gateway"
 	pb "ghost/kernel/internal/protocol"
 	"ghost/kernel/internal/service"
 
@@ -31,6 +34,7 @@ func main() {
 	// Flags
 	grpcPort := flag.Int("grpc-port", 50051, "gRPC server port")
 	httpPort := flag.Int("http-port", 8080, "HTTP gateway port")
+	ghostPort := flag.Int("ghost-port", 5005, "Ghost TCP Gateway port")
 	flag.Parse()
 
 	// 1. Initialize Logger
@@ -69,6 +73,34 @@ func main() {
 
 	// 5. Initialize Logic (The "Brain")
 	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
+
+	// Load Auth Token for Gateway
+	tokenPath := "../ghost.token"
+	authToken := ""
+	if data, err := os.ReadFile(tokenPath); err == nil {
+		authToken = strings.TrimSpace(string(data))
+	} else {
+		// Try current dir
+		if data, err := os.ReadFile("ghost.token"); err == nil {
+			authToken = strings.TrimSpace(string(data))
+		} else {
+			slog.Warn("ghost.token not found, using default/empty token (insecure)")
+		}
+	}
+
+	// Initialize Legacy Bridge & Gateway
+	legacyBridge := service.NewLegacyBridge(ghostService, memoryRepo)
+	gatewayServer := gateway.NewServer("", *ghostPort, authToken)
+	gatewayServer.SetApprovalHandler(legacyBridge)
+	gatewayServer.SetMemoryHandler(legacyBridge)
+
+	// Start Ghost TCP Gateway (Legacy/Brain Support)
+	go func() {
+		slog.Info("Ghost TCP Gateway starting", "port", *ghostPort)
+		if err := gatewayServer.Start(context.Background()); err != nil {
+			slog.Error("Ghost Gateway failed", "error", err)
+		}
+	}()
 
 	// 6. Start gRPC Server
 	grpcAddr := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
@@ -114,17 +146,40 @@ func main() {
 
 		// 2. Serve static frontend (build output from apps/landing or apps/dashboard)
 		staticDir := "./static"
+		cleanStaticDir := filepath.Clean(staticDir)
 		fs := http.FileServer(http.Dir(staticDir))
 
 		rootMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Clean path to prevent directory traversal
-			path := filepath.Clean(r.URL.Path)
-			fullPath := filepath.Join(staticDir, path)
+			// Clean path to prevent directory traversal (URL paths use /)
+			cleanURLPath := path.Clean(r.URL.Path)
+			// Remove leading slash to ensure filepath.Join treats it as relative
+			relPath := strings.TrimPrefix(cleanURLPath, "/")
+			// Convert to OS-specific path separators and join
+			fullPath := filepath.Join(staticDir, filepath.FromSlash(relPath))
+
+			// Security: Ensure path is within static directory
+			// Note: This prevents ".." attacks that filepath.Clean might miss if combined with Join incorrectly
+			if !strings.HasPrefix(fullPath, cleanStaticDir) {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
 
 			// Check if file exists
-			_, err := os.Stat(fullPath)
-			if os.IsNotExist(err) {
-				// If file doesn't exist, serve index.html for client-side routing
+			info, err := os.Stat(fullPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					// If file doesn't exist, serve index.html for client-side routing
+					http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+					return
+				}
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+
+			// If it's a directory, serve index.html (SPA routing) unless strictly asking for a file
+			// This prevents directory listing if index.html is missing in subdir
+			if info.IsDir() {
+				// Optionally check for index.html in subdir, but for SPA usually root index.html handles all
 				http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 				return
 			}
