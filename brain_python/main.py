@@ -449,6 +449,44 @@ class Ghost:
             print(Fore.RED + f"[CONSCIENCE] Blocked: {response.get('reason')}")
             return response
 
+    def _is_safe_path(self, path: str) -> bool:
+        """
+        Check if the path is safe to write to.
+        Blocks directory traversal and sensitive system directories.
+        """
+        try:
+            if not path:
+                return False
+
+            # Resolve absolute path
+            abs_path = os.path.abspath(path)
+
+            # Prevent writing to root of drive
+            # On Linux: /
+            # On Windows: C:\
+            root = os.path.abspath(os.sep)
+            if os.path.dirname(abs_path) == root:
+                 self.logger.warning(f"Blocked write to filesystem root: {abs_path}")
+                 return False
+
+            # Define forbidden prefixes (lower case for comparison)
+            forbidden_prefixes = [
+                "/etc", "/var", "/usr", "/boot", "/sys", "/proc", "/dev", "/bin", "/sbin", # Linux
+                "c:\\windows", "c:\\program files", "c:\\program files (x86)", # Windows
+            ]
+
+            lower_path = abs_path.lower()
+            for prefix in forbidden_prefixes:
+                # Ensure we match full directory names to avoid false positives (e.g. /var vs /variable)
+                if lower_path == prefix or lower_path.startswith(prefix + os.sep):
+                    self.logger.warning(f"Blocked path in forbidden directory: {abs_path}")
+                    return False
+
+            return True
+        except Exception as e:
+            self.logger.error(f"Path validation error: {e}")
+            return False
+
     def _execute_intent(self, user_input: str):
         # --- MUTEX LOCK: ACQUIRE ---
         # This prevents any new voice commands from being processed while thinking/acting
@@ -514,6 +552,11 @@ class Ghost:
                             
                     elif action_type == "WRITE":
                         path = action.get("path")
+
+                        if not self._is_safe_path(path):
+                            print(Fore.RED + f"       [{i}] 🛑 Blocked unsafe write: {path}")
+                            continue
+
                         # Ensure path is valid/safe before writing
                         try:
                             with open(path, 'w') as f: f.write(action.get("content", ""))
