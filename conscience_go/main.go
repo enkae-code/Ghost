@@ -134,9 +134,12 @@ func main() {
 			relPath := strings.TrimLeft(cleanPath, "/\\")
 			fullPath := filepath.Join(absStaticDir, relPath)
 
-			// Verify that the resulting full path starts with the absolute staticDir path
-			// This prevents directory traversal attacks
-			if !strings.HasPrefix(fullPath, absStaticDir) {
+			// Verify that fullPath is inside absStaticDir (directory-boundary check).
+			// Require a path separator after the prefix to prevent sibling paths like
+			// .../static_backup/... from passing a lexical prefix test.
+			sep := string(filepath.Separator)
+			inside := fullPath == absStaticDir || strings.HasPrefix(fullPath, absStaticDir+sep)
+			if !inside {
 				http.NotFound(w, r)
 				return
 			}
