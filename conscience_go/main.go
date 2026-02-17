@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -118,11 +119,30 @@ func main() {
 
 		rootMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Clean path to prevent directory traversal
-			path := filepath.Clean(r.URL.Path)
-			fullPath := filepath.Join(staticDir, path)
+			cleanPath := filepath.Clean(r.URL.Path)
+
+			// Resolve absolute path of static directory
+			absStaticDir, err := filepath.Abs(staticDir)
+			if err != nil {
+				slog.Error("Failed to resolve absolute path", "error", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+
+			// Remove leading separator to ensure join works as relative path
+			// Handle both forward slash (URL) and backslash (Windows)
+			relPath := strings.TrimLeft(cleanPath, "/\\")
+			fullPath := filepath.Join(absStaticDir, relPath)
+
+			// Verify that the resulting full path starts with the absolute staticDir path
+			// This prevents directory traversal attacks
+			if !strings.HasPrefix(fullPath, absStaticDir) {
+				http.NotFound(w, r)
+				return
+			}
 
 			// Check if file exists
-			_, err := os.Stat(fullPath)
+			_, err = os.Stat(fullPath)
 			if os.IsNotExist(err) {
 				// If file doesn't exist, serve index.html for client-side routing
 				http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
