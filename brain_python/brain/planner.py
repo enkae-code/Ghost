@@ -89,6 +89,8 @@ class GhostPlanner:
         import os
         import requests
 
+        print("[BRAIN] ⚠️ WARNING: Using external API fallback. This violates offline-only architecture if unintentional.")
+
         # Try Anthropic first
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if api_key:
