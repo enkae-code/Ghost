@@ -4,9 +4,6 @@ import { InteractionDemo } from '../components/ui/InteractionDemo';
 export const GhostProtocol = () => {
   return (
     <section className="relative py-40 flex flex-col items-center justify-center bg-void overflow-hidden min-h-[90vh]">
-      {/* Cinematic Grain / Texture */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" />
-      
       {/* Background Radial Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-cyan/5 blur-[150px] rounded-full pointer-events-none" />
 
