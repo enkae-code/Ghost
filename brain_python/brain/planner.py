@@ -84,59 +84,6 @@ class GhostPlanner:
             print(f"[BRAIN] ⚠️ Error extracting content: {e}")
             return ""
 
-    def _call_api_fallback(self, messages: list) -> str:
-        """Fallback to Anthropic or OpenAI API when Ollama is unavailable."""
-        import os
-        import requests
-
-        # Try Anthropic first
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if api_key:
-            print("[BRAIN] Using Anthropic API fallback...")
-            resp = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "claude-sonnet-4-20250514",
-                    "max_tokens": 2048,
-                    "system": messages[0]["content"],
-                    "messages": [{"role": "user", "content": messages[1]["content"]}],
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            return resp.json()["content"][0]["text"]
-
-        # Try OpenAI
-        api_key = os.environ.get("OPENAI_API_KEY")
-        if api_key:
-            print("[BRAIN] Using OpenAI API fallback...")
-            resp = requests.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "gpt-4o-mini",
-                    "messages": messages,
-                    "response_format": {"type": "json_object"},
-                    "max_tokens": 2048,
-                },
-                timeout=30,
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
-
-        raise RuntimeError(
-            "No LLM available: Ollama offline and no API keys set "
-            "(set ANTHROPIC_API_KEY or OPENAI_API_KEY)"
-        )
-
     def _build_confused_response(self) -> Dict[str, Any]:
         """Fallback SPEAK response so the user always receives feedback."""
         fallback_text = (
@@ -329,10 +276,7 @@ UI Tree Data:
                     print(f"[BRAIN] Ollama unavailable: {ollama_err}. Trying API fallback...")
 
             if not result:
-                result = self._call_api_fallback(messages)
-
-            if not result:
-                return {"error": "Empty response from LLM"}
+                return {"error": "Empty response from LLM (Ollama offline)"}
 
             # Parse the JSON response
             parsed = json.loads(result)

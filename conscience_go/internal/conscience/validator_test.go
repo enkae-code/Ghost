@@ -74,8 +74,8 @@ func TestValidateActionPath(t *testing.T) {
 		{
 			name:       "Search Missing Directory",
 			actionType: "SEARCH",
-			payload:    map[string]interface{}{"path": "safe_dir"}, // SEARCH requires directory
-			expectError: true,
+			payload:    map[string]interface{}{"path": "safe_dir"}, // SEARCH falls back to path
+			expectError: false,
 		},
 	}
 

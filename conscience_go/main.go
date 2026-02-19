@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -114,6 +115,10 @@ func main() {
 
 		// 2. Serve static frontend (build output from apps/landing or apps/dashboard)
 		staticDir := "./static"
+		absStaticDir, err := filepath.Abs(staticDir)
+		if err != nil {
+			log.Fatalf("Failed to resolve static directory: %v", err)
+		}
 		fs := http.FileServer(http.Dir(staticDir))
 
 		rootMux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -121,8 +126,15 @@ func main() {
 			path := filepath.Clean(r.URL.Path)
 			fullPath := filepath.Join(staticDir, path)
 
+			// Security: Ensure the path is within the static directory
+			absPath, err := filepath.Abs(fullPath)
+			if err != nil || !strings.HasPrefix(absPath, absStaticDir) {
+				http.NotFound(w, r)
+				return
+			}
+
 			// Check if file exists
-			_, err := os.Stat(fullPath)
+			_, err = os.Stat(fullPath)
 			if os.IsNotExist(err) {
 				// If file doesn't exist, serve index.html for client-side routing
 				http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))

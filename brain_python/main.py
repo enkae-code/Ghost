@@ -187,11 +187,15 @@ class Ghost:
         print(Fore.CYAN + "[GHOST] 🔥 Warming up Neural Pathways...")
         try:
             # Send a dummy request to force-load the model into VRAM immediately
-            import requests
-            requests.post(
+            import urllib.request
+            data = json.dumps({"model": "llama3.1", "keep_alive": -1}).encode('utf-8')
+            req = urllib.request.Request(
                 "http://localhost:11434/api/generate",
-                json={"model": "llama3.1", "keep_alive": -1}
+                data=data,
+                headers={'Content-Type': 'application/json'}
             )
+            with urllib.request.urlopen(req) as f:
+                pass
             print(Fore.GREEN + "[GHOST] ✓ Brain Pre-Loaded & Ready.")
         except Exception:
             print(Fore.YELLOW + "[GHOST] ⚠️ Warmup failed (non-critical).")
