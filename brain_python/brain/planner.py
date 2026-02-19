@@ -338,9 +338,6 @@ UI Tree Data:
                     print(f"[BRAIN] Ollama recovery unavailable: {ollama_err}. Trying API fallback...")
 
             if not result:
-                result = self._call_api_fallback(messages)
-
-            if not result:
                 return {"error": "Empty response from LLM"}
 
             parsed = json.loads(result)

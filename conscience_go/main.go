@@ -128,7 +128,8 @@ func main() {
 
 			// Security: Ensure the path is within the static directory
 			absPath, err := filepath.Abs(fullPath)
-			if err != nil || !strings.HasPrefix(absPath, absStaticDir) {
+			prefix := absStaticDir + string(filepath.Separator)
+			if err != nil || (!strings.HasPrefix(absPath, prefix) && absPath != absStaticDir) {
 				http.NotFound(w, r)
 				return
 			}
