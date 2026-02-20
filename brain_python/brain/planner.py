@@ -8,6 +8,8 @@ import json
 import socket
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+from brain.path_utils import is_safe_path
 from datetime import datetime
 
 try:
@@ -367,28 +369,6 @@ UI Tree Data:
         except Exception as e:
             return {"error": f"Unexpected error: {str(e)}"}
     
-    def _is_safe_path(self, path_str: str) -> bool:
-        """
-        Validates that a path is relative and stays within safe boundaries.
-        Prevents path traversal attacks (e.g., ../../windows/system32).
-        """
-        try:
-            path = Path(path_str)
-            # Prevent absolute paths (e.g. C:\ or /etc)
-            if path.is_absolute():
-                return False
-
-            # Resolve path relative to current working directory
-            # We use current directory as the root sandbox
-            base_dir = Path.cwd().resolve()
-            target_path = (base_dir / path).resolve()
-
-            # Check if target path is within base_dir
-            # Note: is_relative_to is available in Python 3.9+
-            return target_path.is_relative_to(base_dir)
-        except Exception:
-            return False
-
     def _validate_actions(self, actions: list) -> Optional[str]:
         """
         Validates action list for security compliance.
@@ -485,14 +465,14 @@ UI Tree Data:
                 path = action.get("path")
                 if not isinstance(path, str) or not path.strip():
                     return f"Action {i}: LIST action requires non-empty 'path'"
-                if not self._is_safe_path(path):
+                if not is_safe_path(path):
                     return f"Action {i}: LIST action path must be relative and safe"
             
             elif action_type == "READ":
                 path = action.get("path")
                 if not isinstance(path, str) or not path.strip():
                     return f"Action {i}: READ action requires non-empty 'path'"
-                if not self._is_safe_path(path):
+                if not is_safe_path(path):
                     return f"Action {i}: READ action path must be relative and safe"
             
             elif action_type == "SEARCH":
@@ -500,7 +480,7 @@ UI Tree Data:
                 pattern = action.get("pattern")
                 if not isinstance(directory, str) or not directory.strip():
                     return f"Action {i}: SEARCH action requires non-empty 'directory'"
-                if not self._is_safe_path(directory):
+                if not is_safe_path(directory):
                     return f"Action {i}: SEARCH action directory must be relative and safe"
                 if not isinstance(pattern, str) or not pattern.strip():
                     return f"Action {i}: SEARCH action requires non-empty 'pattern'"
@@ -510,7 +490,7 @@ UI Tree Data:
                 content = action.get("content")
                 if not isinstance(path, str) or not path.strip():
                     return f"Action {i}: WRITE action requires non-empty 'path'"
-                if not self._is_safe_path(path):
+                if not is_safe_path(path):
                     return f"Action {i}: WRITE action path must be relative and safe"
                 if not isinstance(content, str):
                     return f"Action {i}: WRITE action 'content' must be a string"
@@ -521,7 +501,7 @@ UI Tree Data:
                 replace_text = action.get("replace")
                 if not isinstance(path, str) or not path.strip():
                     return f"Action {i}: EDIT action requires non-empty 'path'"
-                if not self._is_safe_path(path):
+                if not is_safe_path(path):
                     return f"Action {i}: EDIT action path must be relative and safe"
                 if not isinstance(find_text, str) or not find_text:
                     return f"Action {i}: EDIT action requires non-empty 'find'"
