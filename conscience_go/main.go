@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -120,6 +121,15 @@ func main() {
 			// Clean path to prevent directory traversal
 			path := filepath.Clean(r.URL.Path)
 			fullPath := filepath.Join(staticDir, path)
+
+			// Security: Enforce that the resolved path is within the static directory
+			// This prevents path traversal attacks (e.g., /../etc/passwd) that filepath.Join alone might not catch depending on OS
+			absStaticDir, _ := filepath.Abs(staticDir)
+			absFullPath, _ := filepath.Abs(fullPath)
+			if !strings.HasPrefix(absFullPath, absStaticDir+string(filepath.Separator)) && absFullPath != absStaticDir {
+				http.Error(w, "Forbidden", http.StatusForbidden)
+				return
+			}
 
 			// Check if file exists
 			_, err := os.Stat(fullPath)
