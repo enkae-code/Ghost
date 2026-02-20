@@ -187,11 +187,14 @@ class Ghost:
         print(Fore.CYAN + "[GHOST] 🔥 Warming up Neural Pathways...")
         try:
             # Send a dummy request to force-load the model into VRAM immediately
-            import requests
-            requests.post(
+            import urllib.request
+            req = urllib.request.Request(
                 "http://localhost:11434/api/generate",
-                json={"model": "llama3.1", "keep_alive": -1}
+                data=json.dumps({"model": "llama3.1", "keep_alive": -1}).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
             )
+            with urllib.request.urlopen(req) as _:
+                pass
             print(Fore.GREEN + "[GHOST] ✓ Brain Pre-Loaded & Ready.")
         except Exception:
             print(Fore.YELLOW + "[GHOST] ⚠️ Warmup failed (non-critical).")
@@ -385,7 +388,29 @@ class Ghost:
             self.logger.info(f"Invalidated reflex cache for: {intent}")
         else:
             self.logger.debug(f"Could not invalidate reflex (kernel unavailable): {intent}")
-    
+
+    def _is_safe_path(self, path_str: str) -> bool:
+        """
+        Validates that a path is relative and stays within safe boundaries.
+        Prevents path traversal attacks (e.g., ../../windows/system32).
+        """
+        try:
+            path = Path(path_str)
+            # Prevent absolute paths (e.g. C:\ or /etc)
+            if path.is_absolute():
+                return False
+
+            # Resolve path relative to current working directory
+            # We use current directory as the root sandbox
+            base_dir = Path.cwd().resolve()
+            target_path = (base_dir / path).resolve()
+
+            # Check if target path is within base_dir
+            # Note: is_relative_to is available in Python 3.9+
+            return target_path.is_relative_to(base_dir)
+        except Exception:
+            return False
+
     def start(self):
         """Main input loop for Ghost."""
         print(Fore.GREEN + "\n[GHOST] 🚀 Ghost is now active.")
@@ -515,11 +540,14 @@ class Ghost:
                     elif action_type == "WRITE":
                         path = action.get("path")
                         # Ensure path is valid/safe before writing
-                        try:
-                            with open(path, 'w') as f: f.write(action.get("content", ""))
-                            print(f"       [{i}] Wrote: {path}")
-                        except Exception as e:
-                            print(Fore.RED + f"       [{i}] Write Error: {e}")
+                        if self._is_safe_path(path):
+                            try:
+                                with open(path, 'w') as f: f.write(action.get("content", ""))
+                                print(f"       [{i}] Wrote: {path}")
+                            except Exception as e:
+                                print(Fore.RED + f"       [{i}] Write Error: {e}")
+                        else:
+                            print(Fore.RED + f"       [{i}] Blocked unsafe write: {path}")
 
             except Exception as e:
                 print(Fore.RED + f"[GHOST] Action Failed: {e}")
