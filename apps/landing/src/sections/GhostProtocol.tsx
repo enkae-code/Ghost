@@ -6,7 +6,7 @@ export const GhostProtocol = () => {
     <section className="relative py-40 flex flex-col items-center justify-center bg-void overflow-hidden min-h-[90vh]">
       {/* Cinematic Grain / Texture */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" 
-           style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/dark-leather.png")' }} 
+           style={{ backgroundImage: 'url("/assets/dark-leather.png")' }}
       />
       
       {/* Background Radial Glow */}
