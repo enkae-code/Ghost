@@ -273,7 +273,7 @@ UI Tree Data:
                     print(f"[OLLAMA][RESPONSE] {response}", flush=True)
                     result = self._extract_message_content(response)
                 except Exception as ollama_err:
-                    print(f"[BRAIN] Ollama unavailable: {ollama_err}. Trying API fallback...")
+                    print(f"[BRAIN] Ollama unavailable: {ollama_err}. Offline mode only - no fallback available.")
 
             if not result:
                 print("[BRAIN] ⚠️ No response from Ollama. Offline mode only - no fallback available.")
@@ -336,7 +336,7 @@ UI Tree Data:
                     response = ollama.chat(**payload)
                     result = self._extract_message_content(response)
                 except Exception as ollama_err:
-                    print(f"[BRAIN] Ollama recovery unavailable: {ollama_err}. Trying API fallback...")
+                    print(f"[BRAIN] Ollama recovery unavailable: {ollama_err}. Offline mode only - no fallback available.")
 
             if not result:
                 print("[BRAIN] ⚠️ No response from Ollama. Offline mode only - no fallback available.")
