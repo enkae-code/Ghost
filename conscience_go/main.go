@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -77,7 +78,7 @@ func main() {
 	tokenBytes, err := os.ReadFile("ghost.token")
 	var authToken string
 	if err == nil {
-		authToken = string(tokenBytes)
+		authToken = strings.TrimSpace(string(tokenBytes))
 	} else {
 		authToken = uuid.New().String()
 		if err := os.WriteFile("ghost.token", []byte(authToken), 0600); err != nil {
@@ -90,9 +91,10 @@ func main() {
 	gatewayServer.SetApprovalHandler(gatewayAdapter)
 	gatewayServer.SetMemoryHandler(gatewayAdapter)
 
-	// Start Gateway in goroutine
+	// Start Gateway in goroutine (cancellable context for clean shutdown)
+	gwCtx, gwCancel := context.WithCancel(context.Background())
 	go func() {
-		if err := gatewayServer.Start(context.Background()); err != nil {
+		if err := gatewayServer.Start(gwCtx); err != nil && err != context.Canceled {
 			slog.Error("Gateway server failed", "error", err)
 		}
 	}()
@@ -207,5 +209,6 @@ func main() {
 	<-stop
 
 	slog.Info("Shutting down...")
+	gwCancel()
 	grpcServer.GracefulStop()
 }
