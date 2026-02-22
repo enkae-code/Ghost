@@ -16,11 +16,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	"ghost/kernel/internal/adapter"
+	"ghost/kernel/internal/gateway"
 	pb "ghost/kernel/internal/protocol"
 	"ghost/kernel/internal/service"
 
@@ -70,7 +72,32 @@ func main() {
 	// 5. Initialize Logic (The "Brain")
 	ghostService := service.NewGhostService(actionRepo, intentRepo, memoryRepo, stateRepo)
 
-	// 6. Start gRPC Server
+	// 6. Initialize TCP Gateway
+	// Load or generate auth token
+	tokenBytes, err := os.ReadFile("ghost.token")
+	var authToken string
+	if err == nil {
+		authToken = string(tokenBytes)
+	} else {
+		authToken = uuid.New().String()
+		if err := os.WriteFile("ghost.token", []byte(authToken), 0600); err != nil {
+			slog.Warn("Failed to persist token", "error", err)
+		}
+	}
+
+	gatewayAdapter := service.NewGatewayAdapter(ghostService)
+	gatewayServer := gateway.NewServer("127.0.0.1", 5005, authToken)
+	gatewayServer.SetApprovalHandler(gatewayAdapter)
+	gatewayServer.SetMemoryHandler(gatewayAdapter)
+
+	// Start Gateway in goroutine
+	go func() {
+		if err := gatewayServer.Start(context.Background()); err != nil {
+			slog.Error("Gateway server failed", "error", err)
+		}
+	}()
+
+	// 7. Start gRPC Server
 	grpcAddr := fmt.Sprintf("127.0.0.1:%d", *grpcPort)
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
